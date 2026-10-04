@@ -73,7 +73,7 @@ locals {
 check "unmanaged_records" {
   assert {
     condition     = !var.report_unmanaged || length(local.unmanaged_summary) == 0
-    error_message = "The zone has ${length(local.unmanaged_summary)} records that the configuration does not describe (records of other tools, such as external-dns, are listed too). Add them to records and adopt them with import blocks (import_existing gives their IDs), or delete them yourself. Their values are in the sensitive unmanaged_records output (terraform plan -out=tfplan, then terraform show -json tfplan):\n${join("\n", slice(local.unmanaged_summary, 0, min(50, length(local.unmanaged_summary))))}${length(local.unmanaged_summary) > 50 ? "\n... and ${length(local.unmanaged_summary) - 50} more" : ""}"
+    error_message = "The zone has ${length(local.unmanaged_summary)} records that the configuration does not describe (records of other tools, such as external-dns, are listed too). Add them to records and adopt them with import blocks (import_existing gives their IDs), or delete them yourself. Their values are in the sensitive unmanaged_records output: pass it through as a root module output, then terraform plan -out=tfplan and terraform show -json tfplan:\n${join("\n", slice(local.unmanaged_summary, 0, min(50, length(local.unmanaged_summary))))}${length(local.unmanaged_summary) > 50 ? "\n... and ${length(local.unmanaged_summary) - 50} more" : ""}"
   }
 }
 
