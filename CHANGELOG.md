@@ -4,6 +4,8 @@ All notable changes to this project are documented in this file. The format is b
 
 ## [Unreleased]
 
+## [2.11.1] - 2026-10-04
+
 ### Fixed
 
 - IPv6 addresses written in another form (`2001:0db8:0:0:0:0:0:1` for `2001:db8::1`, upper case) were not recognized as the same address: two such records passed the duplicate check (the API rejects the second), and with `import_existing` such a record did not match the existing one, which Cloudflare stores in the canonical form. Addresses are now compared in the canonical form and sent in it; keys keep the address as written, so no state address changes. A record written in another form may get a one-time in-place update of its content to the canonical form
@@ -12,7 +14,7 @@ All notable changes to this project are documented in this file. The format is b
 ### Internal
 
 - Tests: an IPv6 address in two forms (duplicate), sent in the canonical form (core, both wrappers), an IPv4-mapped address, import of an address in another form, TXT with `" "` inside (no false match, same value matches), quoted chunks with escaped quotes and backslashes
-- The end-to-end fixture writes its AAAA record in a non-canonical form, to check against the API that it causes no drift and is matched on import
+- The end-to-end fixture writes its AAAA record in a non-canonical form, to check against the API that it causes no drift and is matched on import (passed on this branch)
 - The lookup limit of `import_existing` still has no automated test: the mocked provider cannot return the nested `result` list of `cloudflare_dns_records`
 
 ## [2.11.0] - 2026-10-04
@@ -355,7 +357,8 @@ All notable changes to this project are documented in this file. The format is b
 - Inline aliases pointed to a relative name instead of the full hostname
 - Zone apex (`@`) handling for aliases and nested names
 
-[Unreleased]: https://github.com/i386dev/terraform-cloudflare-easy-dns/compare/v2.11.0...HEAD
+[Unreleased]: https://github.com/i386dev/terraform-cloudflare-easy-dns/compare/v2.11.1...HEAD
+[2.11.1]: https://github.com/i386dev/terraform-cloudflare-easy-dns/compare/v2.11.0...v2.11.1
 [2.11.0]: https://github.com/i386dev/terraform-cloudflare-easy-dns/compare/v2.10.4...v2.11.0
 [2.10.4]: https://github.com/i386dev/terraform-cloudflare-easy-dns/compare/v2.10.3...v2.10.4
 [2.10.3]: https://github.com/i386dev/terraform-cloudflare-easy-dns/compare/v2.10.2...v2.10.3
