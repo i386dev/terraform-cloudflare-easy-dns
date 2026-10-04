@@ -61,6 +61,13 @@ locals {
     if n.name != "*" && !can(regex("^(\\*\\.)?[^*]*$", n.name))
   ]
 
+  # Each part of a name is checked on its own in the records validation; the name
+  # they combine into with the zone must still fit into 253 characters
+  long_names = distinct([
+    for r in local.records : "\"${r.fqdn}\" (${length(r.fqdn)} characters) from ${r.source}"
+    if length(r.fqdn) > 253
+  ])
+
   # A CNAME pointing to its own name is a loop. Targets are compared like names: case,
   # a trailing dot, "@" and the short form ("www" on www.example.com) do not matter
   self_cnames = [

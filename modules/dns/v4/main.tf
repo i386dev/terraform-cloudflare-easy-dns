@@ -104,7 +104,8 @@ check "records_text_values_are_strings" {
             # fine: a JSON string, or a value that is not a number
             [for attribute in ["content", "key", "comment", "tag"] : startswith(jsonencode(try(record[attribute], "")), "\"") || !can(tonumber(try(record[attribute], "")))],
             [for field in setintersection(try(keys(record.data), []), local.text_data_fields) : startswith(jsonencode(try(record.data[field], "")), "\"") || !can(tonumber(try(record.data[field], "")))],
-            [for index in try(range(length(record.tags)), []) : startswith(jsonencode(try(record.tags[index], "")), "\"") || !can(tonumber(try(record.tags[index], "")))],
+            # tags may be a list or a set (a set has no index), so the values are iterated
+            try([for tag in record.tags : startswith(jsonencode(tag), "\"") || !can(tonumber(tag))], []),
           )
         ]
       ]
@@ -122,8 +123,8 @@ check "records_text_values_are_strings" {
               if !startswith(jsonencode(try(record.data[field], "")), "\"") && can(tonumber(try(record.data[field], "")))
             ],
             [
-              for tag_index in try(range(length(record.tags)), []) : "records[\"${name}\"][\"${type}\"][${index}].tags[${tag_index}] is ${jsonencode(try(record.tags[tag_index], ""))}"
-              if !startswith(jsonencode(try(record.tags[tag_index], "")), "\"") && can(tonumber(try(record.tags[tag_index], "")))
+              for tag in try([for tag in record.tags : tag], []) : "records[\"${name}\"][\"${type}\"][${index}].tags has ${jsonencode(tag)}"
+              if !startswith(jsonencode(tag), "\"") && can(tonumber(tag))
             ],
           )
         ]

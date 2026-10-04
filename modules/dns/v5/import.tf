@@ -48,7 +48,9 @@ locals {
         name    = r.name
         type    = r.type
         content = r.content
-        data    = r.data == null ? null : { for field, value in r.data : field => tostring(value) if value != null }
+        # MX and URI only: the API may return a priority for other types as well
+        priority = contains(["MX", "URI"], r.type) ? r.priority : null
+        data     = r.data == null ? null : { for field, value in r.data : field => tostring(value) if value != null }
       }
     ]
   ])

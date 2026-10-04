@@ -85,3 +85,13 @@ run "null_defaults" {
     error_message = "null default_tags means no tags"
   }
 }
+
+run "fractional_default_ttl" {
+  command = plan
+
+  variables {
+    default_ttl = 3600.5
+  }
+
+  expect_failures = [var.default_ttl]
+}

@@ -18,6 +18,11 @@ output "flat_records" {
   }
 
   precondition {
+    condition     = length(local.long_names) == 0
+    error_message = "A fully qualified name can have at most 253 characters; these names (prefix, name and zone together) are longer:\n${join("\n", local.long_names)}"
+  }
+
+  precondition {
     condition     = length(local.self_cnames) == 0
     error_message = "A CNAME (or alias) cannot point to its own name:\n${join("\n", local.self_cnames)}"
   }

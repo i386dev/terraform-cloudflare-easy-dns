@@ -260,3 +260,57 @@ run "import_uri_target_exact" {
     error_message = "The target of URI records must be compared exactly"
   }
 }
+
+# MX records that differ only in priority match the same existing record; it can be
+# imported into one address only
+run "import_one_id_by_priority" {
+  command = plan
+
+  variables {
+    records = { "@" = { MX = [{ key = "primary", content = "mail.example.com", priority = 10 }, { key = "backup", content = "mail.example.com", priority = 20 }] } }
+    existing_records = [
+      { id = "id-mx", name = "example.com", type = "MX", content = "mail.example.com", priority = 10 },
+    ]
+  }
+
+  assert {
+    condition     = output.import_record_ids == { "@ MX primary" = "id-mx" } && length(output.import_duplicates) == 0
+    error_message = "The record with the same priority gets the existing record, the other one is new"
+  }
+}
+
+run "import_one_id_without_matching_priority" {
+  command = plan
+
+  variables {
+    records = { "@" = { MX = [{ key = "primary", content = "mail.example.com", priority = 10 }, { key = "backup", content = "mail.example.com", priority = 20 }] } }
+    existing_records = [
+      { id = "id-mx", name = "example.com", type = "MX", content = "mail.example.com", priority = 30 },
+    ]
+  }
+
+  expect_failures = [check.import_duplicates]
+
+  assert {
+    condition     = length(output.import_record_ids) == 0 && output.import_duplicates == { "@ MX primary" = ["id-mx"], "@ MX backup" = ["id-mx"] }
+    error_message = "Without a record of the same priority, none of them is imported and both are listed"
+  }
+}
+
+run "import_one_id_with_unknown_priority" {
+  command = plan
+
+  variables {
+    records = { "@" = { MX = [{ key = "primary", content = "mail.example.com", priority = 10 }, { key = "backup", content = "mail.example.com", priority = 20 }] } }
+    existing_records = [
+      { id = "id-mx", name = "example.com", type = "MX", content = "mail.example.com" },
+    ]
+  }
+
+  expect_failures = [check.import_duplicates]
+
+  assert {
+    condition     = length(output.import_record_ids) == 0 && length(output.import_duplicates) == 2
+    error_message = "Without the priority of the existing record, none of them is imported"
+  }
+}

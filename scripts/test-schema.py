@@ -64,6 +64,8 @@ INVALID = {
     "null MX with a priority other than 0": 'records: { "@": { MX: [{ content: ".", priority: 10 }] } }',
     "unquoted boolean in data": 'records: { svc: { SVCB: [{ data: { priority: 1, target: ".", value: off } }] } }',
     "unquoted boolean in tags": 'records: { app: { A: [{ content: 192.0.2.10, tags: [off] }] } }',
+    "fractional TTL": 'records: { app: { A: [{ content: 192.0.2.10, ttl: 60.5 }] } }',
+    "fractional priority": 'records: { "@": { MX: [{ content: mail.example.com, priority: 10.5 }] } }',
 }
 
 # Documents that only the module can reject: the checks compare records with each other
@@ -75,6 +77,7 @@ TERRAFORM_ONLY = {
     "CNAME to its own name": 'records: { app: { CNAME: [{ content: app.example.com. }] } }',
     "TTL below minimum_ttl": 'records: { app: { A: [{ content: 192.0.2.1, ttl: 30 }] } }',
     "wildcard after combining a prefix": 'records: { "*": { _acme-challenge.TXT: [{ content: x }] } }',
+    "name over 253 characters with the zone": 'records: { ' + '.'.join(['a' * 63] * 3) + ': { ' + 'b' * 63 + '.TXT: [{ content: x }] } }',
 }
 
 # Documents that the schema rejects and the module accepts on purpose, with the reason

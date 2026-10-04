@@ -444,3 +444,34 @@ run "null_defaults" {
     error_message = "null defaults mean 3600, false and no tags"
   }
 }
+
+# tags given as a set in HCL: a set has no index, so the values are checked
+run "booleans_in_a_set_of_tags" {
+  command = plan
+
+  variables {
+    records = { "app" = { A = [{ content = "192.0.2.1", tags = toset([false]) }] } }
+  }
+
+  expect_failures = [var.records]
+}
+
+run "numbers_in_a_set_of_tags" {
+  command = plan
+
+  variables {
+    records = { "app" = { A = [{ content = "192.0.2.1", tags = toset([123]) }] } }
+  }
+
+  expect_failures = [check.records_text_values_are_strings]
+}
+
+run "fractional_default_ttl" {
+  command = plan
+
+  variables {
+    default_ttl = 3600.5
+  }
+
+  expect_failures = [var.default_ttl]
+}

@@ -26,7 +26,8 @@ locals {
       content = r.content == null ? null : (
         r.type == "TXT" ? local.existing_txt[r.id] : contains(local.exact_content_types, r.type) ? r.content : lower(trimsuffix(r.content, "."))
       )
-      data = coalesce(r.data, {})
+      priority = r.priority
+      data     = coalesce(r.data, {})
     }
   ]
 
@@ -79,19 +80,41 @@ locals {
 
   # Only unambiguous matches: records with no match are new, records with several
   # matches (duplicates in the zone) are left for manual review
-  import_record_ids = {
+  single_matches = {
     for key, ids in local.import_matches : key => ids[0]
     if length(ids) == 1
   }
-  import_duplicates = {
-    for key, ids in local.import_matches : key => ids
-    if length(ids) > 1
+
+  # An existing record can be imported into one address only. Configured records that
+  # differ only in priority (MX, URI) match the same existing record: the one with the
+  # same priority gets it, and the others are new records. Without such a record, or
+  # with several, none of them is imported.
+  existing_priority = { for e in local.existing : e.id => e.priority }
+  claims            = { for key, id in local.single_matches : id => key... }
+  claim_winners = {
+    for id, keys in local.claims : id => (
+      length(keys) == 1 ? keys : [
+        for key in keys : key
+        if local.flat_records[key].priority != null && local.existing_priority[id] != null && local.flat_records[key].priority == local.existing_priority[id]
+      ]
+    )
   }
+  import_record_ids = {
+    for id, keys in local.claim_winners : keys[0] => id
+    if length(keys) == 1
+  }
+  import_duplicates = merge(
+    { for key, ids in local.import_matches : key => ids if length(ids) > 1 },
+    merge([
+      for id, keys in local.claims : { for key in keys : key => [id] }
+      if length(local.claim_winners[id]) != 1
+    ]...),
+  )
 }
 
 check "import_duplicates" {
   assert {
     condition     = length(local.import_duplicates) == 0
-    error_message = "Records that match several existing records are not imported and would be created again; remove the duplicates from the zone (see the import_duplicates output):\n${join("\n", [for key, ids in local.import_duplicates : "\"${key}\": ${join(", ", ids)}"])}"
+    error_message = "Records that match several existing records, or that match the same existing record as other configured records, are not imported and would be created again; remove the duplicates from the zone, or give the records distinct values or priorities (see the import_duplicates output):\n${join("\n", [for key, ids in local.import_duplicates : "\"${key}\": ${join(", ", ids)}"])}"
   }
 }
