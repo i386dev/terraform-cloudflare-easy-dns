@@ -71,7 +71,7 @@ locals {
 
   # Copies of a configured record in the zone: with import_existing they stop the plan,
   # without it the report lists them, since they are not described either
-  ambiguous_summary = var.import_existing ? [] : [for key, ids in module.records.ambiguous_matches : "\"${key}\": ${join(", ", ids)}"]
+  ambiguous_summary = var.import_existing ? [] : [for m in values(nonsensitive(module.records.ambiguous_matches)) : "${m.type} ${m.name}: ${join(", ", m.ids)}"]
 }
 
 check "unmanaged_records" {

@@ -56,8 +56,9 @@ output "import_duplicates" {
 }
 
 output "ambiguous_matches" {
-  description = "Configured records that match several existing records or share one with other configured records, keyed by record key, also without import_existing (import_duplicates is empty then)"
-  value       = local.matched_duplicates
+  description = "Configured records that several existing records match (copies of one record), keyed by record key, with type, name and IDs, also without import_existing. Sensitive: record keys may contain origin addresses"
+  value       = local.report_ambiguous
+  sensitive   = true
 }
 
 output "unmanaged_records" {

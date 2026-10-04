@@ -628,7 +628,7 @@ run "unmanaged_records_after_priority" {
 }
 
 # MX 10 twice and MX 20 in the zone, MX 10 configured: MX 20 is unmanaged, the two
-# MX 10 are an ambiguous match
+# MX 10 are copies, reported with type, name and IDs (no record key)
 run "unmanaged_records_with_copies" {
   command = plan
 
@@ -648,7 +648,58 @@ run "unmanaged_records_with_copies" {
   }
 
   assert {
-    condition     = keys(output.ambiguous_matches) == ["@ MX mail.example.com"] && length(output.import_duplicates) == 0
-    error_message = "The copies are an ambiguous match, reported but not stopping the plan without import_existing"
+    condition     = jsonencode(values(output.ambiguous_matches)) == jsonencode([{ ids = ["id-mx-10-a", "id-mx-10-b"], name = "example.com", type = "MX" }]) && length(output.import_duplicates) == 0
+    error_message = "The copies are reported with type, name and IDs, and do not stop the plan without import_existing"
+  }
+}
+
+# Both priorities configured: MX 20 is described, only the MX 10 copies are ambiguous
+run "copies_next_to_another_priority" {
+  command = plan
+
+  variables {
+    records = { "@" = { MX = [{ key = "primary", content = "mail.example.com", priority = 10 }, { key = "backup", content = "mail.example.com", priority = 20 }] } }
+    existing_records = [
+      { id = "id-mx-10-a", name = "example.com", type = "MX", content = "mail.example.com", priority = 10 },
+      { id = "id-mx-10-b", name = "example.com", type = "MX", content = "mail.example.com", priority = 10 },
+      { id = "id-mx-20", name = "example.com", type = "MX", content = "mail.example.com", priority = 20 },
+    ]
+    import_existing = false
+  }
+
+  assert {
+    condition     = length(output.unmanaged_records) == 0 && jsonencode(output.ambiguous_matches) == jsonencode({ "@ MX primary" = { ids = ["id-mx-10-a", "id-mx-10-b"], name = "example.com", type = "MX" } })
+    error_message = "Only the copies of MX 10 are ambiguous"
+  }
+}
+
+# Only MX 20 in the zone, MX 10 configured: without the import, MX 20 stays next to
+# the new MX 10 and is unmanaged; with it, MX 20 is adopted as MX 10
+run "other_priority_only_without_import" {
+  command = plan
+
+  variables {
+    records          = { "@" = { MX = [{ content = "mail.example.com", priority = 10 }] } }
+    existing_records = [{ id = "id-mx-20", name = "example.com", type = "MX", content = "mail.example.com", priority = 20 }]
+    import_existing  = false
+  }
+
+  assert {
+    condition     = [for r in output.unmanaged_records : r.id] == ["id-mx-20"]
+    error_message = "A record of another priority is unmanaged without the import"
+  }
+}
+
+run "other_priority_only_with_import" {
+  command = plan
+
+  variables {
+    records          = { "@" = { MX = [{ content = "mail.example.com", priority = 10 }] } }
+    existing_records = [{ id = "id-mx-20", name = "example.com", type = "MX", content = "mail.example.com", priority = 20 }]
+  }
+
+  assert {
+    condition     = output.import_record_ids == { "@ MX mail.example.com" = "id-mx-20" } && length(output.unmanaged_records) == 0
+    error_message = "An imported record is not unmanaged"
   }
 }
