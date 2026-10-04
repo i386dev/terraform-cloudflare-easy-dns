@@ -45,5 +45,25 @@ if [ "$(core_attributes 12)" != "$(allowed flatten_cname)" ]; then
     status=1
 fi
 
+# The root module passes every input to the v5 wrapper and every output back from it,
+# so a missing argument or an output replaced by a constant does not go unnoticed
+while read -r name; do
+    if ! grep -qE "^  ${name} += var\.${name}\$" main.tf; then
+        echo "main.tf does not pass ${name} = var.${name} to module.v5" >&2
+        status=1
+    fi
+done <<EOF
+$(grep -oE '^variable "[a-z_]+"' variables.tf | cut -d'"' -f2)
+EOF
+while read -r name; do
+    value=$(awk -v n="$name" '$0 ~ "^output \"" n "\"" { found = 1 } found && /^  value / { print; exit }' outputs.tf)
+    if ! printf '%s\n' "$value" | grep -qE "^  value += module\.v5\.${name}\$"; then
+        echo "outputs.tf: output ${name} is not module.v5.${name}" >&2
+        status=1
+    fi
+done <<EOF
+$(grep -oE '^output "[a-z_]+"' outputs.tf | cut -d'"' -f2)
+EOF
+
 [ "$status" -eq 0 ] && echo "Module interfaces are in sync"
 exit "$status"

@@ -14,7 +14,7 @@ All notable changes to this project are documented in this file. The format is b
 ### Internal
 
 - The records module takes `import_existing` (default `true`): without it, existing records are only compared for the report, nothing is imported, and ambiguous matches do not stop the plan; new `unmanaged_records` output
-- `scripts/check-sync.sh` allows `report_unmanaged` next to `import_existing` as variables of the v5 wrapper only
+- `scripts/check-sync.sh` allows `report_unmanaged` next to `import_existing` as variables of the v5 wrapper only, and checks that the root module passes every input to the v5 wrapper (`name = var.name`) and takes every output from it
 - Tests: unmanaged records (with and without import, ambiguous matches count as matched, an extra MX next to a configured one of another priority, also when the configured one is in the zone twice, SRV with its priority in data), lookups of all record types, the output in the root module; e2e creates a record outside the module and checks that the report lists it and none of the records of the module (passed on this branch)
 
 ## [2.11.1] - 2026-10-04
