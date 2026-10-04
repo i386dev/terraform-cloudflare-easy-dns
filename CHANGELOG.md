@@ -4,6 +4,8 @@ All notable changes to this project are documented in this file. The format is b
 
 ## [Unreleased]
 
+## [2.11.0] - 2026-10-04
+
 ### Changed
 
 - **With `import_existing`, an ambiguous or incomplete import stops the plan** instead of showing a warning. An ambiguous match (several identical records in the zone, or records that differ only in priority without an existing record of the same priority) used to plan the record as created, which the API rejects at apply or which leaves two copies of it; a lookup that returned 10,000 records (the limit) used to miss the records beyond it. The plan now fails with the list of records (or the record type) and what to do: remove the duplicates from the zone, give the records distinct values or priorities, or set `import_existing = false` and use `import` blocks for these records. Configurations without such records are not affected. The `import_duplicates` output stays, with the same content
@@ -342,7 +344,8 @@ All notable changes to this project are documented in this file. The format is b
 - Inline aliases pointed to a relative name instead of the full hostname
 - Zone apex (`@`) handling for aliases and nested names
 
-[Unreleased]: https://github.com/i386dev/terraform-cloudflare-easy-dns/compare/v2.10.4...HEAD
+[Unreleased]: https://github.com/i386dev/terraform-cloudflare-easy-dns/compare/v2.11.0...HEAD
+[2.11.0]: https://github.com/i386dev/terraform-cloudflare-easy-dns/compare/v2.10.4...v2.11.0
 [2.10.4]: https://github.com/i386dev/terraform-cloudflare-easy-dns/compare/v2.10.3...v2.10.4
 [2.10.3]: https://github.com/i386dev/terraform-cloudflare-easy-dns/compare/v2.10.2...v2.10.3
 [2.10.2]: https://github.com/i386dev/terraform-cloudflare-easy-dns/compare/v2.10.1...v2.10.2
