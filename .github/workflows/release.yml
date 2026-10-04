@@ -30,7 +30,8 @@ jobs:
         run: |
           for attempt in $(seq 1 60); do
             conclusion=$(gh api "repos/${GITHUB_REPOSITORY}/commits/${GITHUB_SHA}/check-runs?check_name=CI%20passed&per_page=100" \
-              --jq '[.check_runs[] | select(.app.slug == "github-actions")] | if length == 0 then "missing" else (sort_by(.started_at) | last | if .status != "completed" then "pending" elif .conclusion == "success" then "success" else "failure" end) end')
+              --jq '[.check_runs[] | select(.app.slug == "github-actions")] | if length == 0 then "missing" else (sort_by(.started_at) | last | if .status != "completed" then "pending" elif .conclusion == "success" then "success" else "failure" end) end') ||
+              conclusion="unavailable (API error)"
             case "$conclusion" in
               success) echo "CI passed for ${GITHUB_SHA}"; exit 0 ;;
               failure) echo "CI failed for ${GITHUB_SHA}"; exit 1 ;;
