@@ -22,3 +22,8 @@ output "import_duplicates" {
   description = "Cloudflare record IDs of existing records that a configured record cannot be matched to unambiguously, keyed by record key. Empty unless import_existing is true; while there are any, the plan stops with this list"
   value       = module.v5.import_duplicates
 }
+
+output "unmanaged_records" {
+  description = "Records in the zone that the configuration does not describe (id, name, type, content, data). Empty unless report_unmanaged is true"
+  value       = module.v5.unmanaged_records
+}

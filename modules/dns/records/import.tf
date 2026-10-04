@@ -117,11 +117,11 @@ locals {
       ]
     )
   }
-  import_record_ids = {
+  matched_record_ids = {
     for id, keys in local.claim_winners : keys[0] => id
     if length(keys) == 1
   }
-  import_duplicates = merge(
+  matched_duplicates = merge(
     { for key, ids in local.narrowed_matches : key => ids if length(ids) > 1 },
     {
       for claim in flatten([
@@ -130,4 +130,23 @@ locals {
       ]) : claim.key => [claim.id]
     },
   )
+
+  # Without import_existing, the existing records are only reported (unmanaged
+  # records), so nothing is imported and an ambiguous match does not stop the plan
+  import_record_ids = { for key, id in local.matched_record_ids : key => id if var.import_existing }
+  import_duplicates = { for key, ids in local.matched_duplicates : key => ids if var.import_existing }
+
+  # Existing records that no configured record matches (also ambiguous matches count
+  # as matched): records in the zone that the configuration does not describe
+  matched_ids = toset(flatten(values(local.import_matches)))
+  unmanaged_records = [
+    for r in var.existing_records : {
+      id      = r.id
+      name    = r.name
+      type    = r.type
+      content = r.content
+      data    = r.data
+    }
+    if !contains(local.matched_ids, r.id)
+  ]
 }

@@ -563,3 +563,47 @@ run "import_txt_opaque_same_text" {
   }
 }
 
+# Records of the zone that no configured record matches are reported as unmanaged;
+# an ambiguous match counts as matched
+run "unmanaged_records" {
+  command = plan
+
+  variables {
+    records = { "app" = { A = [{ content = "192.0.2.1" }] }, "dup" = { A = [{ content = "192.0.2.9" }] } }
+    existing_records = [
+      { id = "id-app", name = "app.example.com", type = "A", content = "192.0.2.1" },
+      { id = "id-dup-1", name = "dup.example.com", type = "A", content = "192.0.2.9" },
+      { id = "id-dup-2", name = "dup.example.com", type = "A", content = "192.0.2.9" },
+      { id = "id-other", name = "other.example.com", type = "A", content = "192.0.2.2" },
+      { id = "id-txt", name = "app.example.com", type = "TXT", content = "external-dns owner" },
+    ]
+    import_existing = false
+  }
+
+  assert {
+    condition     = [for r in output.unmanaged_records : r.id] == ["id-other", "id-txt"]
+    error_message = "Only records that no configured record matches are unmanaged"
+  }
+
+  assert {
+    condition     = length(output.import_record_ids) == 0 && length(output.import_duplicates) == 0
+    error_message = "Without import_existing nothing is imported, and ambiguous matches do not stop the plan"
+  }
+}
+
+run "unmanaged_records_with_import" {
+  command = plan
+
+  variables {
+    records = { "app" = { A = [{ content = "192.0.2.1" }] } }
+    existing_records = [
+      { id = "id-app", name = "app.example.com", type = "A", content = "192.0.2.1" },
+      { id = "id-other", name = "other.example.com", type = "A", content = "192.0.2.2" },
+    ]
+  }
+
+  assert {
+    condition     = output.import_record_ids == { "app A 192.0.2.1" = "id-app" } && [for r in output.unmanaged_records : r.id] == ["id-other"]
+    error_message = "The import and the report work together"
+  }
+}

@@ -109,6 +109,13 @@ variable "import_existing" {
   default     = false
 }
 
+variable "report_unmanaged" {
+  description = "Look up the records of all types in the zone and report those that the configuration does not describe, in the unmanaged_records output and a plan warning. Nothing is deleted. Requires the DNS Read permission (one request per record type)"
+  type        = bool
+  default     = false
+  nullable    = false
+}
+
 variable "default_ttl" {
   description = "TTL of records that do not set one (1 means automatic)"
   type        = number

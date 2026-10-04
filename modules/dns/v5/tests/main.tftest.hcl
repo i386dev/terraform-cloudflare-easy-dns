@@ -488,3 +488,49 @@ run "ipv6_sent_in_canonical_form" {
     error_message = "IPv6 addresses are sent in the canonical form"
   }
 }
+
+# The report reads every record type; the import only the types of the configuration
+run "report_unmanaged_lookups_all_types" {
+  command = plan
+
+  variables {
+    report_unmanaged = true
+  }
+
+  assert {
+    condition     = length(data.cloudflare_dns_records.existing) == 21 && contains(keys(data.cloudflare_dns_records.existing), "PTR")
+    error_message = "One lookup for each record type"
+  }
+
+  assert {
+    condition     = output.unmanaged_records == [] && output.import_ids == {}
+    error_message = "An empty zone has no unmanaged records, and nothing is imported without import_existing"
+  }
+}
+
+run "report_unmanaged_with_import_existing" {
+  command = plan
+
+  variables {
+    report_unmanaged = true
+    import_existing  = true
+  }
+
+  assert {
+    condition     = length(data.cloudflare_dns_records.existing) == 21
+    error_message = "The lookups of the import and the report are shared"
+  }
+}
+
+run "no_report_without_report_unmanaged" {
+  command = plan
+
+  variables {
+    import_existing = true
+  }
+
+  assert {
+    condition     = output.unmanaged_records == []
+    error_message = "unmanaged_records is empty unless report_unmanaged is true"
+  }
+}

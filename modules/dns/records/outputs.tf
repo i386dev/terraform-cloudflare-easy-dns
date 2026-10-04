@@ -54,3 +54,9 @@ output "import_duplicates" {
   description = "Cloudflare record IDs of existing_records that a configured record cannot be matched to unambiguously, keyed by record key. While there are any, import_record_ids fails and the plan stops"
   value       = local.import_duplicates
 }
+
+output "unmanaged_records" {
+  description = "existing_records that no configured record matches: records in the zone that the configuration does not describe"
+  value       = local.unmanaged_records
+}
+
