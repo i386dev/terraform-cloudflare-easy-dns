@@ -703,3 +703,37 @@ run "other_priority_only_with_import" {
     error_message = "An imported record is not unmanaged"
   }
 }
+
+# SRV keeps its priority in data (compared with the data); existing records have no
+# top-level priority for it, so it must not make the record unmanaged
+run "unmanaged_records_srv_priority_in_data" {
+  command = plan
+
+  variables {
+    records = { "_sip._tcp" = { SRV = [{ data = { priority = 10, weight = 5, port = 5060, target = "sip.example.com" } }] } }
+    existing_records = [
+      { id = "id-srv", name = "_sip._tcp.example.com", type = "SRV", data = { priority = "10", weight = "5", port = "5060", target = "sip.example.com." } },
+    ]
+    import_existing = false
+  }
+
+  assert {
+    condition     = length(output.unmanaged_records) == 0
+    error_message = "An SRV record that matches by data is described"
+  }
+}
+
+run "unmanaged_records_mx_priority_unknown" {
+  command = plan
+
+  variables {
+    records          = { "@" = { MX = [{ content = "mail.example.com", priority = 10 }] } }
+    existing_records = [{ id = "id-mx", name = "example.com", type = "MX", content = "mail.example.com" }]
+    import_existing  = false
+  }
+
+  assert {
+    condition     = length(output.unmanaged_records) == 0
+    error_message = "An existing record without a known priority is described"
+  }
+}

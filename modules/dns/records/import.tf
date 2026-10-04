@@ -137,13 +137,14 @@ locals {
   import_duplicates = { for key, ids in local.matched_duplicates : key => ids if var.import_existing }
 
   # Existing records that no configured record matches: records in the zone that the
-  # configuration does not describe. For the report, a configured record with a
-  # priority describes only the existing records of that priority (MX 20 next to, or
-  # instead of, the configured MX 10 is unmanaged), unless the import adopts it
+  # configuration does not describe. For the report, an MX or URI record describes only
+  # the existing records of its priority (MX 20 next to, or instead of, the configured
+  # MX 10 is unmanaged), unless the import adopts it; an existing record without a
+  # known priority still matches. SRV keeps its priority in data, compared already
   report_matches = {
     for key, ids in local.import_matches : key => (
-      local.flat_records[key].priority != null
-      ? [for id in ids : id if local.existing_priority[id] == local.flat_records[key].priority]
+      contains(["MX", "URI"], local.flat_records[key].type) && local.flat_records[key].priority != null
+      ? [for id in ids : id if local.existing_priority[id] == null || local.existing_priority[id] == local.flat_records[key].priority]
       : ids
     )
   }

@@ -71,13 +71,16 @@ locals {
 
   # Copies of a configured record in the zone: with import_existing they stop the plan,
   # without it the report lists them, since they are not described either
-  ambiguous_summary = var.import_existing ? [] : [for m in values(nonsensitive(module.records.ambiguous_matches)) : "${m.type} ${m.name}: ${join(", ", m.ids)}"]
+  ambiguous_summary = var.import_existing ? [] : distinct([for m in values(nonsensitive(module.records.ambiguous_matches)) : "${m.type} ${m.name}: ${join(", ", m.ids)}"])
+
+  unmanaged_message = length(local.unmanaged_summary) == 0 ? "" : "The zone has ${length(local.unmanaged_summary)} records that the configuration does not describe (records of other tools, such as external-dns, are listed too). Add them to records and adopt them with import blocks (import_existing gives their IDs), or delete them yourself. Their values are in the sensitive unmanaged_records output: pass it through as a root module output, then terraform plan -out=tfplan and terraform show -json tfplan:\n${join("\n", slice(local.unmanaged_summary, 0, min(50, length(local.unmanaged_summary))))}${length(local.unmanaged_summary) > 50 ? "\n... and ${length(local.unmanaged_summary) - 50} more" : ""}"
+  ambiguous_message = length(local.ambiguous_summary) == 0 ? "" : "Configured records that match several records in the zone (copies, which only one record can describe); remove the copies:\n${join("\n", local.ambiguous_summary)}"
 }
 
 check "unmanaged_records" {
   assert {
     condition     = !var.report_unmanaged || length(local.unmanaged_summary) + length(local.ambiguous_summary) == 0
-    error_message = "The zone has ${length(local.unmanaged_summary)} records that the configuration does not describe (records of other tools, such as external-dns, are listed too). Add them to records and adopt them with import blocks (import_existing gives their IDs), or delete them yourself. Their values are in the sensitive unmanaged_records output: pass it through as a root module output, then terraform plan -out=tfplan and terraform show -json tfplan:\n${join("\n", slice(local.unmanaged_summary, 0, min(50, length(local.unmanaged_summary))))}${length(local.unmanaged_summary) > 50 ? "\n... and ${length(local.unmanaged_summary) - 50} more" : ""}${length(local.ambiguous_summary) > 0 ? "\nConfigured records that match several records in the zone (copies, which only one record can describe):\n${join("\n", local.ambiguous_summary)}" : ""}"
+    error_message = join("\n\n", compact([local.unmanaged_message, local.ambiguous_message]))
   }
 }
 
