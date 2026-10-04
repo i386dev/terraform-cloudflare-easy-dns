@@ -36,8 +36,19 @@ variables {
 run "import_record_ids" {
   command = plan
 
-  # The two "dup" records in the zone also show a warning
-  expect_failures = [check.import_duplicates]
+  variables {
+    # The zone without the duplicated "dup" records
+    existing_records = [
+      { id = "id-a", name = "App.Example.com", type = "A", content = "30.40.50.60" },
+      { id = "id-txt", name = "example.com", type = "TXT", content = "\"v=spf1 include:_spf.example.net\" \" ~all\"" },
+      { id = "id-cname", name = "www.example.com", type = "CNAME", content = "Example.com." },
+      { id = "id-mx", name = "example.com", type = "MX", content = "mail.example.com" },
+      { id = "id-caa", name = "example.com", type = "CAA", data = { flags = "0", tag = "issue", value = "letsencrypt.org" } },
+      { id = "id-srv", name = "_sip._tcp.example.com", type = "SRV", data = { priority = "10", weight = "5", port = "5060", target = "sip.example.com." } },
+      { id = "id-other", name = "other.example.com", type = "A", content = "9.9.9.9" },
+      { id = "id-wrong-type", name = "app.example.com", type = "AAAA", content = "30.40.50.61" },
+    ]
+  }
 
   assert {
     condition = output.import_record_ids == {
@@ -48,8 +59,15 @@ run "import_record_ids" {
       "@ CAA issue letsencrypt.org"                                          = "id-caa"
       "_sip._tcp SRV sip"                                                    = "id-srv"
     }
-    error_message = "New records, ambiguous matches and unrelated records must be left out"
+    error_message = "New records and unrelated records must be left out"
   }
+}
+
+# Two identical records in the zone: the import is ambiguous, and the plan stops
+run "import_duplicates_stop_the_plan" {
+  command = plan
+
+  expect_failures = [output.import_record_ids]
 
   assert {
     condition     = output.import_duplicates == { "dup A 1.1.1.1" = ["id-dup-1", "id-dup-2"] }
@@ -289,10 +307,10 @@ run "import_one_id_without_matching_priority" {
     ]
   }
 
-  expect_failures = [check.import_duplicates]
+  expect_failures = [output.import_record_ids]
 
   assert {
-    condition     = length(output.import_record_ids) == 0 && output.import_duplicates == { "@ MX primary" = ["id-mx"], "@ MX backup" = ["id-mx"] }
+    condition     = output.import_duplicates == { "@ MX primary" = ["id-mx"], "@ MX backup" = ["id-mx"] }
     error_message = "Without a record of the same priority, none of them is imported and both are listed"
   }
 }
@@ -307,10 +325,87 @@ run "import_one_id_with_unknown_priority" {
     ]
   }
 
-  expect_failures = [check.import_duplicates]
+  expect_failures = [output.import_record_ids]
 
   assert {
-    condition     = length(output.import_record_ids) == 0 && length(output.import_duplicates) == 2
+    condition     = length(output.import_duplicates) == 2
     error_message = "Without the priority of the existing record, none of them is imported"
   }
 }
+
+# A zone with MX 10 and MX 20 on one host: each configured record matches both and
+# takes the one with its priority
+run "import_several_matches_by_priority" {
+  command = plan
+
+  variables {
+    records = { "@" = { MX = [{ key = "primary", content = "mail.example.com", priority = 10 }, { key = "backup", content = "mail.example.com", priority = 20 }] } }
+    existing_records = [
+      { id = "id-mx-10", name = "example.com", type = "MX", content = "mail.example.com", priority = 10 },
+      { id = "id-mx-20", name = "example.com", type = "MX", content = "mail.example.com", priority = 20 },
+    ]
+  }
+
+  assert {
+    condition     = output.import_record_ids == { "@ MX primary" = "id-mx-10", "@ MX backup" = "id-mx-20" } && length(output.import_duplicates) == 0
+    error_message = "Each record takes the existing record with its priority"
+  }
+}
+
+run "import_several_matches_one_priority" {
+  command = plan
+
+  variables {
+    records = { "@" = { MX = [{ content = "mail.example.com", priority = 10 }] } }
+    existing_records = [
+      { id = "id-mx-10", name = "example.com", type = "MX", content = "mail.example.com", priority = 10 },
+      { id = "id-mx-20", name = "example.com", type = "MX", content = "mail.example.com", priority = 20 },
+    ]
+  }
+
+  assert {
+    condition     = output.import_record_ids == { "@ MX mail.example.com" = "id-mx-10" }
+    error_message = "The record takes the existing record with its priority; the other one stays unmanaged"
+  }
+}
+
+# Two existing records with the same priority as well: still ambiguous
+run "import_several_matches_same_priority" {
+  command = plan
+
+  variables {
+    records = { "@" = { MX = [{ content = "mail.example.com", priority = 10 }] } }
+    existing_records = [
+      { id = "id-mx-a", name = "example.com", type = "MX", content = "mail.example.com", priority = 10 },
+      { id = "id-mx-b", name = "example.com", type = "MX", content = "mail.example.com", priority = 10 },
+    ]
+  }
+
+  expect_failures = [output.import_record_ids]
+
+  assert {
+    condition     = output.import_duplicates == { "@ MX mail.example.com" = ["id-mx-a", "id-mx-b"] }
+    error_message = "Several existing records with the same priority stay ambiguous"
+  }
+}
+
+# Several matches and no record with the configured priority: ambiguous
+run "import_several_matches_other_priorities" {
+  command = plan
+
+  variables {
+    records = { "@" = { MX = [{ content = "mail.example.com", priority = 30 }] } }
+    existing_records = [
+      { id = "id-mx-10", name = "example.com", type = "MX", content = "mail.example.com", priority = 10 },
+      { id = "id-mx-20", name = "example.com", type = "MX", content = "mail.example.com", priority = 20 },
+    ]
+  }
+
+  expect_failures = [output.import_record_ids]
+
+  assert {
+    condition     = jsonencode(output.import_duplicates) == jsonencode({ "@ MX mail.example.com" = ["id-mx-10", "id-mx-20"] })
+    error_message = "Without a record of the configured priority the matches stay ambiguous"
+  }
+}
+

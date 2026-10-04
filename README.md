@@ -481,7 +481,7 @@ Cloudflare supports record tags only on some plans and limits the length of comm
 - `records`: managed records keyed by their [record key](#record-keys), with `id`, `name`, `type` and `content`
 - `state_migration`: map of the record keys used by 1.x to the current ones, see [Upgrading from v1](#from-v1-to-v2)
 - `import_ids` (v5): import IDs of records that already exist in the zone, see [Importing Existing Records](#importing-existing-records)
-- `import_duplicates` (v5): records that match several existing records in the zone, with the IDs of the matches; they are not imported
+- `import_duplicates` (v5): records that cannot be imported unambiguously, with the IDs of their matches; while there are any, `plan` stops
 
 ## Records in YAML
 
@@ -601,7 +601,7 @@ When the zone already has records, the first `apply` would fail with "record alr
 
 > **`import_existing` does not import anything by itself.** It only finds the IDs of existing records and exposes them in `import_ids`; the `import` block in step 2 does the import. It is not a reconciliation either: records of the zone that are not in `records` are left alone.
 
-Each lookup reads up to 10,000 records of one type; in a zone with more records of a configured type, the rest are not found and would be created again. `plan` shows a warning when a lookup returns 10,000 records; import the remaining records with `import` blocks of their own.
+Each lookup reads up to 10,000 records of one type; in a zone with more records of a configured type, the rest are not found and would be created again. When a lookup returns 10,000 records, `plan` stops (from 2.11.0; a warning before): set `import_existing = false` and import the records with `import` blocks of their own.
 
 1. Set `import_existing = true`. The module then reads the records of the zone (the API token needs the `DNS Read` permission) and matches them to the configured records by name, type and value. The records are read with one request per record type of the configuration, which avoids a provider crash on zones with CAA records ([cloudflare/terraform-provider-cloudflare#7004](https://github.com/cloudflare/terraform-provider-cloudflare/issues/7004)).
 2. Add an `import` block next to the module call:
@@ -621,7 +621,7 @@ Each lookup reads up to 10,000 records of one type; in a zone with more records 
 
 For structured records (`SRV`, `HTTPS`, `TLSA`, ...), provider v5 plans a one-time in-place update right after the import, without visible changes; after the `apply`, the plan is empty.
 
-Matching ignores the case and a trailing dot of names, hostnames (`target`, `replacement`, the issuer domain of CAA `issue`/`issuewild` values) and hex values (`digest`, `fingerprint`, and `certificate` of TLSA and SMIMEA records); other `data` fields (also the `target` of URI records, whose paths are case-sensitive), CAA parameters after `;`, `iodef` URLs and OPENPGPKEY keys must match exactly. TXT values are compared without the split into quoted chunks; a value in the zone file form (`"v=spf1 \"a\" -all"`) is compared without its surrounding quotes and escapes, since Cloudflare stores TXT content as it was sent and `v=spf1 "a" -all` is the same DNS record; quotes inside the value count. A TXT record stored in the quoted form and configured without quotes gets a one-time in-place update to the configured form after the import (the DNS answer does not change). An existing record is imported into one address only: configured records that differ only in `priority` (`MX`, `URI`) match the same existing record, which goes to the one with the same priority, while the others are created; without such a record, none of them is imported and they are listed like duplicates. A record is imported only when exactly one existing record matches it: when the zone has several identical records, the record is not imported and `plan` shows it as created, so the duplicates can be cleaned up first. Such records are listed in the `import_duplicates` output with the IDs of all their matches, and `plan` shows a warning with the same list; [`examples/import`](https://github.com/i386dev/terraform-cloudflare-easy-dns/tree/main/examples/import) passes the output through so it shows up in `plan`.
+Matching ignores the case and a trailing dot of names, hostnames (`target`, `replacement`, the issuer domain of CAA `issue`/`issuewild` values) and hex values (`digest`, `fingerprint`, and `certificate` of TLSA and SMIMEA records); other `data` fields (also the `target` of URI records, whose paths are case-sensitive), CAA parameters after `;`, `iodef` URLs and OPENPGPKEY keys must match exactly. TXT values are compared without the split into quoted chunks; a value in the zone file form (`"v=spf1 \"a\" -all"`) is compared without its surrounding quotes and escapes, since Cloudflare stores TXT content as it was sent and `v=spf1 "a" -all` is the same DNS record; quotes inside the value count. A TXT record stored in the quoted form and configured without quotes gets a one-time in-place update to the configured form after the import (the DNS answer does not change). An existing record is imported into one address only: configured records that differ only in `priority` (`MX`, `URI`) match the same existing record, which goes to the one with the same priority, while the others are created; without such a record, the import is ambiguous. In the same way, a record with a priority that matches several existing records (MX 10 and MX 20 on one host) takes the one with its priority. A record is imported only when its match is unambiguous. When it is not, for example when the zone has several identical records, `plan` stops (from 2.11.0; before, it showed a warning and planned the record as created) and lists the records with the IDs of all their matches. Remove the duplicates from the zone or give the records distinct values or priorities; to import such a record anyway, set `import_existing = false` and write an `import` block for it. The `import_duplicates` output has the same list.
 
 ## Upgrading and Migration
 
@@ -659,6 +659,12 @@ Version 2 changes the record keys in the state (see [Record Keys](#record-keys))
 
 3. Run `terraform plan`. It should only show records that have moved, with no records to add or destroy.
 4. Run `terraform apply`, then delete `dns_migration.tf`. The next `terraform plan` should show no changes.
+
+### To 2.11: Ambiguous Imports Stop the Plan
+
+> **Configurations with `import_existing = true`:** if `plan` showed a warning about records that match several existing records, or about a lookup that returned 10,000 records, it now fails with the same list.
+
+An ambiguous import used to plan the record as created, which fails at apply or leaves two copies of it in the zone. Remove the duplicates from the zone, give the records distinct values or priorities, or set `import_existing = false` and adopt these records with `import` blocks; see [Importing Existing Records](#importing-existing-records). Configurations without `import_existing`, and those whose plans showed no such warning, are not affected.
 
 ### To 2.8: Minimum TTL
 

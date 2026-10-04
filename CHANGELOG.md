@@ -4,6 +4,18 @@ All notable changes to this project are documented in this file. The format is b
 
 ## [Unreleased]
 
+### Changed
+
+- **With `import_existing`, an ambiguous or incomplete import stops the plan** instead of showing a warning. An ambiguous match (several identical records in the zone, or records that differ only in priority without an existing record of the same priority) used to plan the record as created, which the API rejects at apply or which leaves two copies of it; a lookup that returned 10,000 records (the limit) used to miss the records beyond it. The plan now fails with the list of records (or the record type) and what to do: remove the duplicates from the zone, give the records distinct values or priorities, or set `import_existing = false` and use `import` blocks for these records. Configurations without such records are not affected. The `import_duplicates` output stays, with the same content
+
+### Added
+
+- With `import_existing`, a record with a priority (MX, URI) that matches several existing records takes the one with its priority: a zone with MX 10 and MX 20 on one host and the configuration with both now imports both (before, neither was imported)
+
+### Internal
+
+- Tests: ambiguous matches stop the plan (identical records in the zone, the same priority twice, no record of the configured priority), several matches resolved by priority; the lookup limit was checked against a real zone with the limit lowered to 1 (the plan stops, and the saved plan is not applyable)
+
 ## [2.10.4] - 2026-10-04
 
 ### Fixed

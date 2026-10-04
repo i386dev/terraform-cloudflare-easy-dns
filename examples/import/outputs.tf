@@ -4,6 +4,6 @@ output "import_ids" {
 }
 
 output "import_duplicates" {
-  description = "Records that match several existing records, which are not imported: remove the duplicates from the zone"
+  description = "Records that cannot be imported unambiguously (the plan stops while there are any)"
   value       = module.dns.import_duplicates
 }

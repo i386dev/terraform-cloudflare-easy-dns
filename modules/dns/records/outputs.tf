@@ -39,11 +39,18 @@ output "state_migration" {
 }
 
 output "import_record_ids" {
-  description = "Cloudflare record IDs of existing_records matching the configured records, keyed by record key. Records with no or several matches are left out"
+  description = "Cloudflare record IDs of existing_records matching the configured records, keyed by record key. Records with no match are left out; ambiguous matches stop the plan (see import_duplicates)"
   value       = local.import_record_ids
+
+  # An ambiguous import would plan the record as new, and the API rejects it at
+  # apply (or keeps two copies of it), so the plan stops here instead
+  precondition {
+    condition     = length(local.import_duplicates) == 0
+    error_message = "These records cannot be imported unambiguously: each matches several existing records, or the same existing record as other configured records. Remove the duplicates from the zone or give the records distinct values or priorities; to import such a record anyway, set import_existing = false and write an import block for it:\n${join("\n", [for key, ids in local.import_duplicates : "\"${key}\": ${join(", ", ids)}"])}"
+  }
 }
 
 output "import_duplicates" {
-  description = "Cloudflare record IDs of existing_records that match the same configured record, keyed by record key. These records are not imported"
+  description = "Cloudflare record IDs of existing_records that a configured record cannot be matched to unambiguously, keyed by record key. While there are any, import_record_ids fails and the plan stops"
   value       = local.import_duplicates
 }
