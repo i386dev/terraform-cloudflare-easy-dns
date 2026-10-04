@@ -15,7 +15,7 @@ All notable changes to this project are documented in this file. The format is b
 
 ### Changed
 
-- The release workflow publishes a tag only after CI passed for the tagged commit (it waits for a CI run that is still in progress)
+- The release workflow builds the archives and the GitHub release only after CI passed for the tagged commit (it waits for a CI run that is still in progress); the tag itself is available to Git sources as soon as it is pushed
 
 ### Internal
 
