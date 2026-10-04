@@ -431,3 +431,16 @@ run "fractional_default_ttl" {
 
   expect_failures = [var.default_ttl]
 }
+
+run "ipv6_sent_in_canonical_form" {
+  command = plan
+
+  variables {
+    records = { "app" = { AAAA = [{ content = "2001:0DB8:0:0:0:0:0:1" }] } }
+  }
+
+  assert {
+    condition     = cloudflare_record.record["app AAAA 2001:0DB8:0:0:0:0:0:1"].content == "2001:db8::1"
+    error_message = "IPv6 addresses are sent in the canonical form"
+  }
+}

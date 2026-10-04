@@ -409,3 +409,157 @@ run "import_several_matches_other_priorities" {
   }
 }
 
+run "import_ipv6_in_another_form" {
+  command = plan
+
+  variables {
+    records          = { "app" = { AAAA = [{ content = "2001:0db8:0:0:0:0:0:1" }] } }
+    existing_records = [{ id = "id-aaaa", name = "app.example.com", type = "AAAA", content = "2001:db8::1" }]
+  }
+
+  assert {
+    condition     = output.import_record_ids == { "app AAAA 2001:0db8:0:0:0:0:0:1" = "id-aaaa" }
+    error_message = "IPv6 addresses must be compared in their canonical form"
+  }
+}
+
+# Quotes inside a value that is not in the zone file form count: prefix" "suffix is
+# not prefixsuffix
+run "import_txt_quote_space_quote_inside_the_value" {
+  command = plan
+
+  variables {
+    records = { "app" = { TXT = [{ content = "prefix\" \"suffix", key = "q" }] } }
+    existing_records = [
+      { id = "id-joined", name = "app.example.com", type = "TXT", content = "prefixsuffix" },
+    ]
+  }
+
+  assert {
+    condition     = output.import_record_ids == {}
+    error_message = "A value with quotes inside must not match the value without them"
+  }
+}
+
+run "import_txt_quote_space_quote_same_value" {
+  command = plan
+
+  variables {
+    records = { "app" = { TXT = [{ content = "prefix\" \"suffix", key = "q" }] } }
+    existing_records = [
+      { id = "id-same", name = "app.example.com", type = "TXT", content = "prefix\" \"suffix" },
+    ]
+  }
+
+  assert {
+    condition     = output.import_record_ids == { "app TXT q" = "id-same" }
+    error_message = "The same value must match"
+  }
+}
+
+# Chunks in the zone file form with escaped quotes and backslashes
+run "import_txt_chunks_with_escapes" {
+  command = plan
+
+  variables {
+    records = {
+      "app" = {
+        TXT = [
+          { content = "v=spf1 \"a\" -all", key = "spf" },
+          { content = "a\\b", key = "backslash" },
+        ]
+      }
+    }
+    existing_records = [
+      { id = "id-spf", name = "app.example.com", type = "TXT", content = "\"v=spf1 \\\"a\\\"\" \" -all\"" },
+      { id = "id-backslash", name = "app.example.com", type = "TXT", content = "\"a\\\\b\"" },
+    ]
+  }
+
+  assert {
+    condition     = output.import_record_ids == { "app TXT spf" = "id-spf", "app TXT backslash" = "id-backslash" }
+    error_message = "Chunks must be joined and unescaped"
+  }
+}
+
+# Only \" and \\ are unescaped. A value with another escape, such as the decimal
+# escape \065 ("A" in zone files), is compared exactly: "\065" is not "\\065"
+run "import_txt_decimal_escape_compared_exactly" {
+  command = plan
+
+  variables {
+    records = {
+      "app" = {
+        TXT = [
+          { content = "\\065", key = "backslash" },
+          { content = "\"\\065\"", key = "decimal" },
+        ]
+      }
+    }
+    existing_records = [
+      { id = "id-decimal", name = "app.example.com", type = "TXT", content = "\"\\065\"" },
+      { id = "id-backslash", name = "app.example.com", type = "TXT", content = "\"\\\\065\"" },
+    ]
+  }
+
+  assert {
+    condition     = output.import_record_ids == { "app TXT backslash" = "id-backslash", "app TXT decimal" = "id-decimal" }
+    error_message = "A decimal escape must not match an escaped backslash with digits"
+  }
+}
+
+run "import_ipv4_mapped_in_another_form" {
+  command = plan
+
+  variables {
+    records          = { "app" = { AAAA = [{ content = "::ffff:c000:201" }] } }
+    existing_records = [{ id = "id-mapped", name = "app.example.com", type = "AAAA", content = "::ffff:192.0.2.1" }]
+  }
+
+  assert {
+    condition     = output.import_record_ids == { "app AAAA ::ffff:c000:201" = "id-mapped" }
+    error_message = "IPv4-mapped addresses must be compared in one form"
+  }
+}
+
+# A value that is not in the supported zone file form is opaque: it never matches the
+# decoded value of another one, in both directions (contents below as sent:
+# "\065" and "\"\\065\"", "v=spf1 \045all" quoted and its escaped form)
+run "import_txt_opaque_never_matches_a_decoded_value" {
+  command = plan
+
+  variables {
+    records = {
+      "app" = {
+        TXT = [
+          { content = "\"\\065\"", key = "opaque" },
+          { content = "\"\\\"v=spf1 \\\\045all\\\"\"", key = "encoded" },
+        ]
+      }
+    }
+    existing_records = [
+      { id = "id-encoded", name = "app.example.com", type = "TXT", content = "\"\\\"\\\\065\\\"\"" },
+      { id = "id-opaque", name = "app.example.com", type = "TXT", content = "\"v=spf1 \\045all\"" },
+    ]
+  }
+
+  assert {
+    condition     = output.import_record_ids == {}
+    error_message = "An opaque value must not match a decoded one"
+  }
+}
+
+run "import_txt_opaque_same_text" {
+  command = plan
+
+  variables {
+    records          = { "app" = { TXT = [{ content = "\"v=spf1 \\045all\"", key = "spf" }] } }
+    existing_records = [{ id = "id-spf", name = "app.example.com", type = "TXT", content = "\"v=spf1 \\045all\"" }]
+  }
+
+  assert {
+    condition     = output.import_record_ids == { "app TXT spf" = "id-spf" }
+    error_message = "An opaque value matches the same text"
+  }
+}
+
