@@ -7,15 +7,18 @@ locals {
   # compared exactly.
   #
   # Cloudflare stores TXT content as it was sent, and v=spf1 "a" -all and
-  # "v=spf1 \"a\" -all" are the same DNS record. So TXT values are joined from
-  # quoted chunks, and a quoted value loses its surrounding quotes and its escapes
-  # (\" and \\); quotes inside the value still count.
-  txt_chunks_joined = { for r in var.existing_records : r.id => r.content == null ? "" : replace(r.content, "\" \"", "") }
+  # "v=spf1 \"a\" -all" are the same DNS record. A value in the zone file form
+  # (one or more quoted chunks, "a" "b") is compared as its chunks joined, without
+  # the quotes and the escapes (\" and \\). Any other value is compared exactly,
+  # quotes included, so prefix" "suffix is not prefixsuffix.
+  txt_zone_file_form = "^\"(?:[^\"\\\\]|\\\\.)*\"(?:[ \\t]+\"(?:[^\"\\\\]|\\\\.)*\")*$"
+  txt_chunk          = "\"((?:[^\"\\\\]|\\\\.)*)\""
   existing_txt = {
-    for id, v in local.txt_chunks_joined : id => (
-      length(v) >= 2 && startswith(v, "\"") && endswith(v, "\"")
-      ? replace(replace(substr(v, 1, length(v) - 2), "\\\"", "\""), "\\\\", "\\")
-      : v
+    for r in var.existing_records : r.id => (
+      r.content == null ? "" :
+      can(regex(local.txt_zone_file_form, r.content))
+      ? replace(join("", [for chunk in regexall(local.txt_chunk, r.content) : chunk[0]]), "/\\\\(.)/", "$1")
+      : r.content
     )
   }
   existing = [
@@ -24,7 +27,10 @@ locals {
       name = lower(trimsuffix(r.name, "."))
       type = r.type
       content = r.content == null ? null : (
-        r.type == "TXT" ? local.existing_txt[r.id] : contains(local.exact_content_types, r.type) ? r.content : lower(trimsuffix(r.content, "."))
+        r.type == "TXT" ? local.existing_txt[r.id] :
+        contains(local.exact_content_types, r.type) ? r.content :
+        r.type == "AAAA" && strcontains(try(cidrhost("${r.content}/128", 0), ""), ":") ? cidrhost("${r.content}/128", 0) :
+        lower(trimsuffix(r.content, "."))
       )
       priority = r.priority
       data     = coalesce(r.data, {})
@@ -42,16 +48,13 @@ locals {
   # compared like a hostname, the parameters (account URIs, ...) exactly
   caa_issuer_tags = ["issue", "issuewild"]
 
-  configured_txt_joined = {
-    for key, rec in local.flat_records : key => replace(rec.content, "\" \"", "")
-    if rec.type == "TXT"
-  }
   configured_txt = {
-    for key, v in local.configured_txt_joined : key => (
-      length(v) >= 2 && startswith(v, "\"") && endswith(v, "\"")
-      ? replace(replace(substr(v, 1, length(v) - 2), "\\\"", "\""), "\\\\", "\\")
-      : v
+    for key, rec in local.flat_records : key => (
+      can(regex(local.txt_zone_file_form, rec.content))
+      ? replace(join("", [for chunk in regexall(local.txt_chunk, rec.content) : chunk[0]]), "/\\\\(.)/", "$1")
+      : rec.content
     )
+    if rec.type == "TXT"
   }
 
   import_matches = {

@@ -25,6 +25,16 @@ locals {
     }
   ]
 
+  # Canonical form of the configured IPv6 addresses (cidrhost formats them like
+  # RFC 5952: lower case, no leading zeros, the longest run of zeros as ::). An
+  # IPv4-mapped address would come back as IPv4, so it stays as written (in lower
+  # case), like a value that is not an address (rejected by the validation)
+  canonical_ipv6 = {
+    for address in distinct([for r in local.resolved : r.content if r.type == "AAAA"]) : address => (
+      strcontains(try(cidrhost("${address}/128", 0), ""), ":") ? cidrhost("${address}/128", 0) : lower(address)
+    )
+  }
+
   # Keys follow the zone file format: "<name> <TYPE> <value>"
   keyed = [
     for r in local.resolved : merge(r, {
@@ -47,14 +57,17 @@ locals {
       name    = r.name
       fqdn    = local.fqdn[r.name]
       # The key without its name part, normalized like DNS compares it: addresses
-      # and hostnames case-insensitively and without a trailing dot
+      # and hostnames case-insensitively and without a trailing dot, IPv6 addresses
+      # in their canonical form (2001:0db8:0:0:0:0:0:1 is 2001:db8::1)
       key_value = (
         r.rec.key == null && contains(["A", "AAAA", "MX", "NS", "PTR"], r.type)
-        ? "${r.type} ${lower(trimsuffix(r.content, "."))}"
+        ? "${r.type} ${r.type == "AAAA" ? local.canonical_ipv6[r.content] : lower(trimsuffix(r.content, "."))}"
         : trimprefix(r.key, "${r.name} ")
       )
-      type    = r.type
-      content = r.type == "CAA" || contains(local.data_types, r.type) ? null : r.content
+      type = r.type
+      # IPv6 addresses are sent in the canonical form, as Cloudflare stores them; the
+      # key keeps the address as written
+      content = r.type == "CAA" || contains(local.data_types, r.type) ? null : r.type == "AAAA" ? local.canonical_ipv6[r.content] : r.content
       ttl     = coalesce(r.rec.ttl, var.default_ttl)
       proxied = (
         r.rec.proxied != null ? r.rec.proxied :

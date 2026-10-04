@@ -1113,3 +1113,27 @@ run "alias_target_over_253_characters" {
   expect_failures = [output.flat_records]
 }
 
+# IPv6 addresses are compared in their canonical form: the same address written
+# twice is a duplicate
+run "ipv6_written_in_two_forms" {
+  command = plan
+  variables {
+    records = { "app" = { AAAA = [{ content = "2001:db8::1" }, { content = "2001:0db8:0:0:0:0:0:1" }] } }
+  }
+  expect_failures = [output.flat_records]
+}
+
+run "ipv6_sent_in_canonical_form" {
+  command = plan
+  variables {
+    records = { "app" = { AAAA = [{ content = "2001:0DB8:0:0:0:0:0:1" }, { content = "::ffff:192.0.2.1" }] } }
+  }
+  assert {
+    condition     = output.flat_records["app AAAA 2001:0DB8:0:0:0:0:0:1"].content == "2001:db8::1"
+    error_message = "The key keeps the address as written, the content is canonical"
+  }
+  assert {
+    condition     = output.flat_records["app AAAA ::ffff:192.0.2.1"].content == "::ffff:192.0.2.1"
+    error_message = "An IPv4-mapped address stays an IPv6 address"
+  }
+}

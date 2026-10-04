@@ -3,7 +3,9 @@ output "records" {
   value = {
     (local.p) = {
       A             = [{ content = var.a_value }, { content = "192.0.2.11", ttl = 600 }]
-      AAAA          = [{ content = "2001:db8::10" }]
+      # Not in the canonical form (2001:db8::10), which Cloudflare stores: no drift and
+      # a match on import show that the module sends and compares the canonical form
+      AAAA          = [{ content = "2001:0DB8:0:0:0:0:0:10" }]
       TXT           = [{ content = "v=spf1 -all" }, { key = "rotating", content = var.txt_value }]
       MX            = [{ content = "mx.${local.z}", priority = 10 }]
       CAA           = [{ content = "letsencrypt.org", tag = "issue" }]
