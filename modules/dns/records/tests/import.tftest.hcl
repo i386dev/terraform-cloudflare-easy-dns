@@ -626,3 +626,29 @@ run "unmanaged_records_after_priority" {
     error_message = "A record left out by the priority is unmanaged"
   }
 }
+
+# MX 10 twice and MX 20 in the zone, MX 10 configured: MX 20 is unmanaged, the two
+# MX 10 are an ambiguous match
+run "unmanaged_records_with_copies" {
+  command = plan
+
+  variables {
+    records = { "@" = { MX = [{ content = "mail.example.com", priority = 10 }] } }
+    existing_records = [
+      { id = "id-mx-10-a", name = "example.com", type = "MX", content = "mail.example.com", priority = 10 },
+      { id = "id-mx-10-b", name = "example.com", type = "MX", content = "mail.example.com", priority = 10 },
+      { id = "id-mx-20", name = "example.com", type = "MX", content = "mail.example.com", priority = 20 },
+    ]
+    import_existing = false
+  }
+
+  assert {
+    condition     = [for r in output.unmanaged_records : r.id] == ["id-mx-20"]
+    error_message = "A record of another priority is unmanaged, also next to copies"
+  }
+
+  assert {
+    condition     = keys(output.ambiguous_matches) == ["@ MX mail.example.com"] && length(output.import_duplicates) == 0
+    error_message = "The copies are an ambiguous match, reported but not stopping the plan without import_existing"
+  }
+}

@@ -55,6 +55,11 @@ output "import_duplicates" {
   value       = local.import_duplicates
 }
 
+output "ambiguous_matches" {
+  description = "Configured records that match several existing records or share one with other configured records, keyed by record key, also without import_existing (import_duplicates is empty then)"
+  value       = local.matched_duplicates
+}
+
 output "unmanaged_records" {
   description = "existing_records that no configured record matches: records in the zone that the configuration does not describe. Sensitive: the content of a proxied record is the origin address that Cloudflare hides"
   value       = local.unmanaged_records

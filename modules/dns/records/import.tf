@@ -136,10 +136,20 @@ locals {
   import_record_ids = { for key, id in local.matched_record_ids : key => id if var.import_existing }
   import_duplicates = { for key, ids in local.matched_duplicates : key => ids if var.import_existing }
 
-  # Existing records that no configured record matches, after the ties are broken by
-  # priority (MX 20 next to the configured MX 10 is not matched); ambiguous matches
-  # count as matched: records in the zone that the configuration does not describe
-  matched_ids = toset(flatten(values(local.narrowed_matches)))
+  # Existing records that no configured record matches: records in the zone that the
+  # configuration does not describe. A configured record with a priority matches the
+  # existing records of that priority when there are any (so MX 20 next to the
+  # configured MX 10 is unmanaged, also when MX 10 is in the zone twice); copies of the
+  # same record count as matched and are reported as ambiguous matches instead
+  report_matches = {
+    for key, ids in local.import_matches : key => (
+      local.flat_records[key].priority != null
+      && length([for id in ids : id if local.existing_priority[id] == local.flat_records[key].priority]) > 0
+      ? [for id in ids : id if local.existing_priority[id] == local.flat_records[key].priority]
+      : ids
+    )
+  }
+  matched_ids = toset(flatten(values(local.report_matches)))
   unmanaged_records = [
     for r in var.existing_records : {
       id       = r.id

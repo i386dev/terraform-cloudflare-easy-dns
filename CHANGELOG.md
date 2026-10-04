@@ -8,14 +8,14 @@ All notable changes to this project are documented in this file. The format is b
 
 ### Added
 
-- `report_unmanaged` input (root module, v5 wrapper): reads the records of all types in the zone (one request per type, `DNS Read` permission) and lists those that the configuration does not describe in the new `unmanaged_records` output (sensitive: the content of a proxied record is its hidden origin address; read it from a saved plan) and a `plan` warning with the type, name and ID of each (the first 50). Nothing is deleted; each record can be added to `records` and adopted with an `import` block, or deleted by hand. A lookup at the 10,000 limit stops the plan, as for the import
+- `report_unmanaged` input (root module, v5 wrapper): reads the records of all types in the zone (one request per type, `DNS Read` permission) and lists those that the configuration does not describe in the new `unmanaged_records` output (sensitive: the content of a proxied record is its hidden origin address; read it from a saved plan) and a `plan` warning with the type, name and ID of each (the first 50); without `import_existing`, the warning also lists configured records that match several records in the zone. Nothing is deleted; each record can be added to `records` and adopted with an `import` block, or deleted by hand. A lookup at the 10,000 limit stops the plan, as for the import
 - README: "Next to external-dns", how to share a zone with a controller that manages records at run time, and "Records Not in the Configuration"
 
 ### Internal
 
 - The records module takes `import_existing` (default `true`): without it, existing records are only compared for the report, nothing is imported, and ambiguous matches do not stop the plan; new `unmanaged_records` output
 - `scripts/check-sync.sh` allows `report_unmanaged` next to `import_existing` as variables of the v5 wrapper only
-- Tests: unmanaged records (with and without import, ambiguous matches count as matched, an extra MX next to a configured one of another priority), lookups of all record types, the output in the root module; e2e creates a record outside the module and checks that the report lists it and none of the records of the module (passed on this branch)
+- Tests: unmanaged records (with and without import, ambiguous matches count as matched, an extra MX next to a configured one of another priority, also when the configured one is in the zone twice), lookups of all record types, the output in the root module; e2e creates a record outside the module and checks that the report lists it and none of the records of the module (passed on this branch)
 
 ## [2.11.1] - 2026-10-04
 
