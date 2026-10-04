@@ -9,11 +9,11 @@ locals {
   # Cloudflare stores TXT content as it was sent, and v=spf1 "a" -all and
   # "v=spf1 \"a\" -all" are the same DNS record. A value in the zone file form
   # (one or more quoted chunks, "a" "b") is compared as its chunks joined, without
-  # the quotes and the escapes \" and \\ (other escapes such as \065 stay as
-  # written). Any other value is compared exactly, quotes included, so
-  # prefix" "suffix is not prefixsuffix.
-  txt_zone_file_form = "^\"(?:[^\"\\\\]|\\\\.)*\"(?:[ \\t]+\"(?:[^\"\\\\]|\\\\.)*\")*$"
-  txt_chunk          = "\"((?:[^\"\\\\]|\\\\.)*)\""
+  # the quotes and the escapes \" and \\. Any other value is compared exactly, quotes
+  # included, so prefix" "suffix is not prefixsuffix; so is a value with another
+  # escape such as \065 (a decimal escape, "A" in zone files), which is not decoded.
+  txt_zone_file_form = "^\"(?:[^\"\\\\]|\\\\[\"\\\\])*\"(?:[ \\t]+\"(?:[^\"\\\\]|\\\\[\"\\\\])*\")*$"
+  txt_chunk          = "\"((?:[^\"\\\\]|\\\\[\"\\\\])*)\""
   existing_txt = {
     for r in var.existing_records : r.id => (
       r.content == null ? "" :
@@ -30,7 +30,7 @@ locals {
       content = r.content == null ? null : (
         r.type == "TXT" ? local.existing_txt[r.id] :
         contains(local.exact_content_types, r.type) ? r.content :
-        r.type == "AAAA" && strcontains(try(cidrhost("${r.content}/128", 0), ""), ":") ? cidrhost("${r.content}/128", 0) :
+        r.type == "AAAA" && can(cidrhost("${r.content}/128", 0)) ? (strcontains(cidrhost("${r.content}/128", 0), ":") ? cidrhost("${r.content}/128", 0) : "::ffff:${cidrhost("${r.content}/128", 0)}") :
         lower(trimsuffix(r.content, "."))
       )
       priority = r.priority

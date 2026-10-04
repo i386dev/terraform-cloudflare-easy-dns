@@ -482,27 +482,43 @@ run "import_txt_chunks_with_escapes" {
   }
 }
 
-# Only \" and \\ are unescaped: \065 (a decimal escape in zone files) stays as written
-run "import_txt_other_escapes_stay" {
+# Only \" and \\ are unescaped. A value with another escape, such as the decimal
+# escape \065 ("A" in zone files), is compared exactly: "\065" is not "\\065"
+run "import_txt_decimal_escape_compared_exactly" {
   command = plan
 
   variables {
     records = {
       "app" = {
         TXT = [
-          { content = "065", key = "digits" },
-          { content = "\\065", key = "escape" },
+          { content = "\\065", key = "backslash" },
+          { content = "\"\\065\"", key = "decimal" },
         ]
       }
     }
     existing_records = [
-      { id = "id-escape", name = "app.example.com", type = "TXT", content = "\"\\065\"" },
+      { id = "id-decimal", name = "app.example.com", type = "TXT", content = "\"\\065\"" },
+      { id = "id-backslash", name = "app.example.com", type = "TXT", content = "\"\\\\065\"" },
     ]
   }
 
   assert {
-    condition     = output.import_record_ids == { "app TXT escape" = "id-escape" }
-    error_message = "A decimal escape must not be compared as its digits"
+    condition     = output.import_record_ids == { "app TXT backslash" = "id-backslash", "app TXT decimal" = "id-decimal" }
+    error_message = "A decimal escape must not match an escaped backslash with digits"
+  }
+}
+
+run "import_ipv4_mapped_in_another_form" {
+  command = plan
+
+  variables {
+    records          = { "app" = { AAAA = [{ content = "::ffff:c000:201" }] } }
+    existing_records = [{ id = "id-mapped", name = "app.example.com", type = "AAAA", content = "::ffff:192.0.2.1" }]
+  }
+
+  assert {
+    condition     = output.import_record_ids == { "app AAAA ::ffff:c000:201" = "id-mapped" }
+    error_message = "IPv4-mapped addresses must be compared in one form"
   }
 }
 

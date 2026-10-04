@@ -27,11 +27,14 @@ locals {
 
   # Canonical form of the configured IPv6 addresses (cidrhost formats them like
   # RFC 5952: lower case, no leading zeros, the longest run of zeros as ::). An
-  # IPv4-mapped address would come back as IPv4, so it stays as written (in lower
-  # case), like a value that is not an address (rejected by the validation)
+  # IPv4-mapped address comes back as IPv4 and gets the ::ffff: prefix back
+  # (::ffff:c000:201 is ::ffff:192.0.2.1); a value that is not an address (rejected
+  # by the validation) stays as written, in lower case
   canonical_ipv6 = {
     for address in distinct([for r in local.resolved : r.content if r.type == "AAAA"]) : address => (
-      strcontains(try(cidrhost("${address}/128", 0), ""), ":") ? cidrhost("${address}/128", 0) : lower(address)
+      !can(cidrhost("${address}/128", 0)) ? lower(address) :
+      strcontains(cidrhost("${address}/128", 0), ":") ? cidrhost("${address}/128", 0) :
+      "::ffff:${cidrhost("${address}/128", 0)}"
     )
   }
 
