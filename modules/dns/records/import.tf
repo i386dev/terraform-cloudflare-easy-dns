@@ -142,11 +142,12 @@ locals {
   matched_ids = toset(flatten(values(local.narrowed_matches)))
   unmanaged_records = [
     for r in var.existing_records : {
-      id      = r.id
-      name    = r.name
-      type    = r.type
-      content = r.content
-      data    = r.data
+      id       = r.id
+      name     = r.name
+      type     = r.type
+      content  = r.content
+      priority = r.priority
+      data     = r.data
     }
     if !contains(local.matched_ids, r.id)
   ]

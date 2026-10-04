@@ -64,10 +64,16 @@ locals {
 # module never deletes records it does not manage. The warning has no record values:
 # the content of a proxied record is the origin address that Cloudflare hides, and
 # plans often end up in CI logs
+locals {
+  # Type, name and ID of each unmanaged record, for the warning; the values stay in the
+  # sensitive output
+  unmanaged_summary = [for r in nonsensitive(module.records.unmanaged_records) : "${r.type} ${r.name} (${r.id})"]
+}
+
 check "unmanaged_records" {
   assert {
-    condition     = !var.report_unmanaged || length(module.records.unmanaged_records) == 0
-    error_message = "The zone has ${length(module.records.unmanaged_records)} records that the configuration does not describe (records of other tools, such as external-dns, are listed too). Add them to records and adopt them with import blocks (import_existing gives their IDs), or delete them yourself. Their values are in the sensitive unmanaged_records output (terraform output -json unmanaged_records):\n${join("\n", [for r in module.records.unmanaged_records : "${r.type} ${r.name} (${r.id})"])}"
+    condition     = !var.report_unmanaged || length(local.unmanaged_summary) == 0
+    error_message = "The zone has ${length(local.unmanaged_summary)} records that the configuration does not describe (records of other tools, such as external-dns, are listed too). Add them to records and adopt them with import blocks (import_existing gives their IDs), or delete them yourself. Their values are in the sensitive unmanaged_records output (terraform plan -out=tfplan, then terraform show -json tfplan):\n${join("\n", slice(local.unmanaged_summary, 0, min(50, length(local.unmanaged_summary))))}${length(local.unmanaged_summary) > 50 ? "\n... and ${length(local.unmanaged_summary) - 50} more" : ""}"
   }
 }
 

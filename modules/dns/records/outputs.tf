@@ -56,7 +56,8 @@ output "import_duplicates" {
 }
 
 output "unmanaged_records" {
-  description = "existing_records that no configured record matches: records in the zone that the configuration does not describe"
+  description = "existing_records that no configured record matches: records in the zone that the configuration does not describe. Sensitive: the content of a proxied record is the origin address that Cloudflare hides"
   value       = local.unmanaged_records
+  sensitive   = true
 }
 

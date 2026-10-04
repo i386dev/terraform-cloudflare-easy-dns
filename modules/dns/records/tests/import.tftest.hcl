@@ -622,7 +622,7 @@ run "unmanaged_records_after_priority" {
   }
 
   assert {
-    condition     = output.import_record_ids == { "@ MX mail.example.com" = "id-mx-10" } && [for r in output.unmanaged_records : r.id] == ["id-mx-20"]
+    condition     = output.import_record_ids == { "@ MX mail.example.com" = "id-mx-10" } && [for r in output.unmanaged_records : "${r.id} ${r.priority}"] == ["id-mx-20 20"]
     error_message = "A record left out by the priority is unmanaged"
   }
 }

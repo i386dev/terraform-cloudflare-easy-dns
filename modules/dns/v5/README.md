@@ -55,5 +55,5 @@ Manages DNS records with `cloudflare_dns_record`. See the [main README](https://
 | <a name="output_record_names"></a> [record\_names](#output\_record\_names) | Names of all managed records |
 | <a name="output_records"></a> [records](#output\_records) | Managed records keyed by their stable identifier, with id, name, type and content |
 | <a name="output_state_migration"></a> [state\_migration](#output\_state\_migration) | Map of record keys used by module versions 1.x to the current keys, for state migration |
-| <a name="output_unmanaged_records"></a> [unmanaged\_records](#output\_unmanaged\_records) | Records in the zone that the configuration does not describe (id, name, type, content, data). Empty unless report\_unmanaged is true |
+| <a name="output_unmanaged_records"></a> [unmanaged\_records](#output\_unmanaged\_records) | Records in the zone that the configuration does not describe (id, name, type, content, priority, data). Empty unless report\_unmanaged is true. Sensitive: the content of a proxied record is the origin address that Cloudflare hides |
 <!-- END_TF_DOCS -->
