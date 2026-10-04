@@ -42,6 +42,7 @@ Manages DNS records with `cloudflare_dns_record`. See the [main README](https://
 | <a name="input_import_existing"></a> [import\_existing](#input\_import\_existing) | Look up records that already exist in the zone and expose their IDs in the import\_ids output, to adopt them with import blocks. Requires the DNS Read permission | `bool` | `false` | no |
 | <a name="input_minimum_ttl"></a> [minimum\_ttl](#input\_minimum\_ttl) | Lowest TTL other than 1 (automatic). Cloudflare accepts TTLs below 60 seconds only on Enterprise zones: set 30 there, keep 60 otherwise | `number` | `60` | no |
 | <a name="input_records"></a> [records](#input\_records) | DNS records: `records[NAME][TYPE] = [RECORD, ...]`, where NAME is a name within the<br/>zone (`@` for the apex) and TYPE a record type, optionally with a prefix<br/>(`"_acme-challenge.TXT"`). Record attributes: `content`, `ttl`, `proxied`, `priority`,<br/>`tag`, `flags`, `data`, `key`, `comment`, `tags` and `settings` (`flatten_cname`,<br/>`ipv4_only`, `ipv6_only`). See the README for the details. Unknown attributes fail at plan. | `any` | n/a | yes |
+| <a name="input_report_unmanaged"></a> [report\_unmanaged](#input\_report\_unmanaged) | Look up the records of all types in the zone and report those that the configuration does not describe, in the unmanaged\_records output and a plan warning. Nothing is deleted. Requires the DNS Read permission (one request per record type) | `bool` | `false` | no |
 | <a name="input_zone_id"></a> [zone\_id](#input\_zone\_id) | Cloudflare Zone ID | `string` | n/a | yes |
 | <a name="input_zone_name"></a> [zone\_name](#input\_zone\_name) | Zone domain name (e.g. example.com). If null, it is looked up from zone\_id. A trailing dot is ignored. Internationalized zones must set it, in Punycode | `string` | `null` | no |
 
@@ -54,4 +55,5 @@ Manages DNS records with `cloudflare_dns_record`. See the [main README](https://
 | <a name="output_record_names"></a> [record\_names](#output\_record\_names) | Names of all managed records |
 | <a name="output_records"></a> [records](#output\_records) | Managed records keyed by their stable identifier, with id, name, type and content |
 | <a name="output_state_migration"></a> [state\_migration](#output\_state\_migration) | Map of record keys used by module versions 1.x to the current keys, for state migration |
+| <a name="output_unmanaged_records"></a> [unmanaged\_records](#output\_unmanaged\_records) | Records in the zone that the configuration does not describe (id, name, type, content, data). Empty unless report\_unmanaged is true |
 <!-- END_TF_DOCS -->
