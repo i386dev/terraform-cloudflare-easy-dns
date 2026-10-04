@@ -20,27 +20,21 @@ data "cloudflare_dns_records" "existing" {
   zone_id   = var.zone_id
   type      = each.key
   max_items = local.import_max_items
+
+  lifecycle {
+    # Records beyond the limit are not found, so they would be planned as new records
+    # and fail with "record already exists" at apply; the plan stops instead
+    postcondition {
+      condition     = length(self.result) < local.import_max_items
+      error_message = "The lookup of existing ${each.key} records returned ${local.import_max_items} records (the limit), so records beyond it would not be found and would be planned as new. Set import_existing = false and import these records with import blocks of their own."
+    }
+  }
 }
 
 locals {
   # Records read per type; a lookup that returns this many was probably cut off
   import_max_items = 10000
-  import_truncated = [
-    for type, lookup in data.cloudflare_dns_records.existing : type
-    if length(lookup.result) >= local.import_max_items
-  ]
-}
 
-# Records beyond the limit are not found, so they would be planned as new records and
-# fail with "record already exists" at apply
-check "import_lookup_complete" {
-  assert {
-    condition     = length(local.import_truncated) == 0
-    error_message = "The lookup of existing records returned ${local.import_max_items} records (the limit) for: ${join(", ", local.import_truncated)}. Records beyond the limit are not found and would be planned as new; import them with import blocks of their own."
-  }
-}
-
-locals {
   existing_records = flatten([
     for type, lookup in data.cloudflare_dns_records.existing : [
       for r in lookup.result : {

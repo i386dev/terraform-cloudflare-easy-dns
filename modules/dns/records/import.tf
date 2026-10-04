@@ -78,10 +78,23 @@ locals {
     ]
   }
 
+  # Configured records with a priority (MX, URI) that match several existing records
+  # take the one with the same priority (a zone with MX 10 and MX 20 on one host).
+  # Without such a record, or with several, the matches stay ambiguous
+  existing_priority = { for e in local.existing : e.id => e.priority }
+  narrowed_matches = {
+    for key, ids in local.import_matches : key => (
+      length(ids) > 1 && local.flat_records[key].priority != null
+      && length([for id in ids : id if local.existing_priority[id] == local.flat_records[key].priority]) == 1
+      ? [for id in ids : id if local.existing_priority[id] == local.flat_records[key].priority]
+      : ids
+    )
+  }
+
   # Only unambiguous matches: records with no match are new, records with several
-  # matches (duplicates in the zone) are left for manual review
+  # matches (duplicates in the zone) are not imported, and the plan stops on them
   single_matches = {
-    for key, ids in local.import_matches : key => ids[0]
+    for key, ids in local.narrowed_matches : key => ids[0]
     if length(ids) == 1
   }
 
@@ -89,8 +102,7 @@ locals {
   # differ only in priority (MX, URI) match the same existing record: the one with the
   # same priority gets it, and the others are new records. Without such a record, or
   # with several, none of them is imported.
-  existing_priority = { for e in local.existing : e.id => e.priority }
-  claims            = { for key, id in local.single_matches : id => key... }
+  claims = { for key, id in local.single_matches : id => key... }
   claim_winners = {
     for id, keys in local.claims : id => (
       length(keys) == 1 ? keys : [
@@ -104,7 +116,7 @@ locals {
     if length(keys) == 1
   }
   import_duplicates = merge(
-    { for key, ids in local.import_matches : key => ids if length(ids) > 1 },
+    { for key, ids in local.narrowed_matches : key => ids if length(ids) > 1 },
     {
       for claim in flatten([
         for id, keys in local.claims : [for key in keys : { key = key, id = id }]
@@ -112,11 +124,4 @@ locals {
       ]) : claim.key => [claim.id]
     },
   )
-}
-
-check "import_duplicates" {
-  assert {
-    condition     = length(local.import_duplicates) == 0
-    error_message = "Records that match several existing records, or that match the same existing record as other configured records, are not imported and would be created again; remove the duplicates from the zone, or give the records distinct values or priorities (see the import_duplicates output):\n${join("\n", [for key, ids in local.import_duplicates : "\"${key}\": ${join(", ", ids)}"])}"
-  }
 }

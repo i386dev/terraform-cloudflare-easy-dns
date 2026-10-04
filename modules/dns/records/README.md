@@ -40,7 +40,7 @@ No resources.
 | Name | Description |
 | ---- | ----------- |
 | <a name="output_flat_records"></a> [flat\_records](#output\_flat\_records) | Flattened map of records keyed by "<name> <TYPE> <value>", ready for for\_each |
-| <a name="output_import_duplicates"></a> [import\_duplicates](#output\_import\_duplicates) | Cloudflare record IDs of existing\_records that match the same configured record, keyed by record key. These records are not imported |
-| <a name="output_import_record_ids"></a> [import\_record\_ids](#output\_import\_record\_ids) | Cloudflare record IDs of existing\_records matching the configured records, keyed by record key. Records with no or several matches are left out |
+| <a name="output_import_duplicates"></a> [import\_duplicates](#output\_import\_duplicates) | Cloudflare record IDs of existing\_records that a configured record cannot be matched to unambiguously, keyed by record key. While there are any, import\_record\_ids fails and the plan stops |
+| <a name="output_import_record_ids"></a> [import\_record\_ids](#output\_import\_record\_ids) | Cloudflare record IDs of existing\_records matching the configured records, keyed by record key. Records with no match are left out; ambiguous matches stop the plan (see import\_duplicates) |
 | <a name="output_state_migration"></a> [state\_migration](#output\_state\_migration) | Map of record keys used by module versions 1.x to the current keys, for state migration |
 <!-- END_TF_DOCS -->

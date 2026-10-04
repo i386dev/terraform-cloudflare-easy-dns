@@ -21,11 +21,11 @@ output "state_migration" {
 }
 
 output "import_ids" {
-  description = "Import IDs (<zone_id>/<record_id>) of records that already exist in the zone, keyed by record key. Empty unless import_existing is true; records with no or several matches are left out"
+  description = "Import IDs (<zone_id>/<record_id>) of records that already exist in the zone, keyed by record key. Empty unless import_existing is true; records with no match are left out, and ambiguous matches stop the plan"
   value       = { for key, id in module.records.import_record_ids : key => "${var.zone_id}/${id}" }
 }
 
 output "import_duplicates" {
-  description = "Cloudflare record IDs of existing records that match the same configured record (duplicates in the zone), keyed by record key. Empty unless import_existing is true; these records are not imported, remove the duplicates from the zone first"
+  description = "Cloudflare record IDs of existing records that a configured record cannot be matched to unambiguously, keyed by record key. Empty unless import_existing is true; while there are any, the plan stops with this list"
   value       = module.records.import_duplicates
 }
