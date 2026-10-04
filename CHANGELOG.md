@@ -4,6 +4,8 @@ All notable changes to this project are documented in this file. The format is b
 
 ## [Unreleased]
 
+## [2.12.0] - 2026-10-04
+
 ### Added
 
 - `report_unmanaged` input (root module, v5 wrapper): reads the records of all types in the zone (one request per type, `DNS Read` permission) and lists those that the configuration does not describe in the new `unmanaged_records` output and a `plan` warning. Nothing is deleted; each record can be added to `records` (and adopted with `import_existing`) or deleted by hand. A lookup at the 10,000 limit stops the plan, as for the import
@@ -368,7 +370,8 @@ All notable changes to this project are documented in this file. The format is b
 - Inline aliases pointed to a relative name instead of the full hostname
 - Zone apex (`@`) handling for aliases and nested names
 
-[Unreleased]: https://github.com/i386dev/terraform-cloudflare-easy-dns/compare/v2.11.1...HEAD
+[Unreleased]: https://github.com/i386dev/terraform-cloudflare-easy-dns/compare/v2.12.0...HEAD
+[2.12.0]: https://github.com/i386dev/terraform-cloudflare-easy-dns/compare/v2.11.1...v2.12.0
 [2.11.1]: https://github.com/i386dev/terraform-cloudflare-easy-dns/compare/v2.11.0...v2.11.1
 [2.11.0]: https://github.com/i386dev/terraform-cloudflare-easy-dns/compare/v2.10.4...v2.11.0
 [2.10.4]: https://github.com/i386dev/terraform-cloudflare-easy-dns/compare/v2.10.3...v2.10.4
