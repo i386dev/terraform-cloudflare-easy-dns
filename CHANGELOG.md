@@ -4,9 +4,18 @@ All notable changes to this project are documented in this file. The format is b
 
 ## [Unreleased]
 
+### Fixed
+
+- A `zone_name` with non-ASCII characters (`münchen.de`) failed with the general "must be the DNS name of the zone" error; it now gets its own error that asks for Punycode (`xn--mnchen-3ya.de`) or an unset `zone_name` (root module and both wrappers)
+
 ### Changed
 
+- README: `zone_name` must also be given in Punycode
 - README: rewriting a record name in another form (`www` to `www.example.com`, `WWW` to `www`) changes its key and recreates the record unless a `moved` block keeps it
+
+### Internal
+
+- Tests: a Unicode `zone_name` in the root module and both wrappers
 
 ## [2.10.1] - 2026-10-03
 

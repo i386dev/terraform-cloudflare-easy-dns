@@ -230,6 +230,16 @@ run "empty_zone_name" {
   expect_failures = [var.zone_name]
 }
 
+run "unicode_zone_name" {
+  command = plan
+
+  variables {
+    zone_name = "münchen.de"
+  }
+
+  expect_failures = [var.zone_name]
+}
+
 run "zone_name_with_a_trailing_dot" {
   command = plan
 

@@ -61,6 +61,16 @@ run "record_is_not_an_object" {
   expect_failures = [var.records]
 }
 
+run "unicode_zone_name" {
+  command = plan
+
+  variables {
+    zone_name = "münchen.de"
+  }
+
+  expect_failures = [var.zone_name]
+}
+
 # The same document as the schema tests, through yamldecode like a dns.yaml
 run "yaml_all_types" {
   command = plan
