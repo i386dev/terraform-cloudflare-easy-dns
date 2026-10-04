@@ -673,8 +673,9 @@ run "copies_next_to_another_priority" {
   }
 }
 
-# Only MX 20 in the zone, MX 10 configured: without the import, MX 20 stays next to
-# the new MX 10 and is unmanaged; with it, MX 20 is adopted as MX 10
+# Only MX 20 in the zone, MX 10 configured: MX 20 is unmanaged. With import_existing it
+# is also offered for import (an import block would adopt it as MX 10), but the module
+# cannot know whether there is an import block, so the report still lists it
 run "other_priority_only_without_import" {
   command = plan
 
@@ -699,8 +700,8 @@ run "other_priority_only_with_import" {
   }
 
   assert {
-    condition     = output.import_record_ids == { "@ MX mail.example.com" = "id-mx-20" } && length(output.unmanaged_records) == 0
-    error_message = "An imported record is not unmanaged"
+    condition     = output.import_record_ids == { "@ MX mail.example.com" = "id-mx-20" } && [for r in output.unmanaged_records : r.id] == ["id-mx-20"]
+    error_message = "An import candidate of another priority is offered and still reported"
   }
 }
 
