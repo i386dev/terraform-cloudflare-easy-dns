@@ -8,9 +8,15 @@ variable "zone_name" {
   type        = string
   default     = null
 
-  # Checked here: an empty name would otherwise fail in coalesce() with an unclear error
+  # Checked here: an empty name would otherwise fail in coalesce() with an unclear error.
+  # A non-ASCII name gets its own error, since the DNS name rule does not say why it fails
   validation {
-    condition     = var.zone_name == null || can(regex("^[A-Za-z0-9_]([A-Za-z0-9_-]{0,61}[A-Za-z0-9_])?(\\.[A-Za-z0-9_]([A-Za-z0-9_-]{0,61}[A-Za-z0-9_])?)*\\.?$", var.zone_name))
+    condition     = var.zone_name == null || !can(regex("[^[:ascii:]]", var.zone_name))
+    error_message = "zone_name must be in Punycode, as the Cloudflare API expects it (xn--mnchen-3ya.de for münchen.de), or null to look it up from zone_id."
+  }
+
+  validation {
+    condition     = var.zone_name == null || can(regex("[^[:ascii:]]", var.zone_name)) || can(regex("^[A-Za-z0-9_]([A-Za-z0-9_-]{0,61}[A-Za-z0-9_])?(\\.[A-Za-z0-9_]([A-Za-z0-9_-]{0,61}[A-Za-z0-9_])?)*\\.?$", var.zone_name))
     error_message = "zone_name must be the DNS name of the zone, such as example.com (or null to look it up from zone_id)."
   }
 }
