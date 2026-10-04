@@ -105,10 +105,12 @@ locals {
   }
   import_duplicates = merge(
     { for key, ids in local.import_matches : key => ids if length(ids) > 1 },
-    merge([
-      for id, keys in local.claims : { for key in keys : key => [id] }
-      if length(local.claim_winners[id]) != 1
-    ]...),
+    {
+      for claim in flatten([
+        for id, keys in local.claims : [for key in keys : { key = key, id = id }]
+        if length(local.claim_winners[id]) != 1
+      ]) : claim.key => [claim.id]
+    },
   )
 }
 
