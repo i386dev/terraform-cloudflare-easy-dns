@@ -12,7 +12,7 @@ variable "zone_name" {
   # A non-ASCII name gets its own error, since the DNS name rule does not say why it fails
   validation {
     condition     = var.zone_name == null || !can(regex("[^[:ascii:]]", var.zone_name))
-    error_message = "zone_name must be in Punycode, as the Cloudflare API expects it (xn--mnchen-3ya.de for münchen.de), or unset to look it up from zone_id."
+    error_message = "zone_name must be in Punycode, as the Cloudflare API expects it (xn--mnchen-3ya.de for münchen.de), or null to look it up from zone_id."
   }
 
   validation {
