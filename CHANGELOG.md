@@ -4,6 +4,8 @@ All notable changes to this project are documented in this file. The format is b
 
 ## [Unreleased]
 
+## [2.10.3] - 2026-10-04
+
 ### Fixed
 
 - Internationalized zones: Cloudflare returns the name of such a zone in Unicode (`münchen.de`), while record names come back in Punycode, so a zone looked up by `zone_id` failed at `plan` with "The zone name must be a DNS name". The lookup now fails with a message to set `zone_name` in Punycode (`xn--mnchen-3ya.de`), and the error for a non-ASCII `zone_name` added in 2.10.2 no longer suggests leaving it unset (root module and both wrappers)
@@ -311,7 +313,8 @@ All notable changes to this project are documented in this file. The format is b
 - Inline aliases pointed to a relative name instead of the full hostname
 - Zone apex (`@`) handling for aliases and nested names
 
-[Unreleased]: https://github.com/i386dev/terraform-cloudflare-easy-dns/compare/v2.10.2...HEAD
+[Unreleased]: https://github.com/i386dev/terraform-cloudflare-easy-dns/compare/v2.10.3...HEAD
+[2.10.3]: https://github.com/i386dev/terraform-cloudflare-easy-dns/compare/v2.10.2...v2.10.3
 [2.10.2]: https://github.com/i386dev/terraform-cloudflare-easy-dns/compare/v2.10.1...v2.10.2
 [2.10.1]: https://github.com/i386dev/terraform-cloudflare-easy-dns/compare/v2.10.0...v2.10.1
 [2.10.0]: https://github.com/i386dev/terraform-cloudflare-easy-dns/compare/v2.9.0...v2.10.0
