@@ -62,11 +62,19 @@ locals {
   ]
 
   # Each part of a name is checked on its own in the records validation; the name
-  # they combine into with the zone must still fit into 253 characters
-  long_names = distinct([
-    for r in local.records : "\"${r.fqdn}\" (${length(r.fqdn)} characters) from ${r.source}"
-    if length(r.fqdn) > 253
-  ])
+  # they combine into with the zone must still fit into 253 characters. The same goes
+  # for the targets that ALIASES build from a prefix and a name (CNAME targets written
+  # in the configuration are limited by the validation already)
+  long_names = distinct(concat(
+    [
+      for r in local.records : "\"${r.fqdn}\" (${length(r.fqdn)} characters) from ${r.source}"
+      if length(r.fqdn) > 253
+    ],
+    [
+      for r in local.records : "\"${trimsuffix(r.content, ".")}\" (${length(trimsuffix(r.content, "."))} characters), the target of \"${r.key}\" from ${r.source}"
+      if r.type == "CNAME" && length(trimsuffix(r.content == null ? "" : r.content, ".")) > 253
+    ],
+  ))
 
   # A CNAME pointing to its own name is a loop. Targets are compared like names: case,
   # a trailing dot, "@" and the short form ("www" on www.example.com) do not matter

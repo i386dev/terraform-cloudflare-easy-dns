@@ -19,7 +19,7 @@ output "flat_records" {
 
   precondition {
     condition     = length(local.long_names) == 0
-    error_message = "A fully qualified name can have at most 253 characters; these names (prefix, name and zone together) are longer:\n${join("\n", local.long_names)}"
+    error_message = "A fully qualified name can have at most 253 characters; these names and alias targets (prefix, name and zone together) are longer:\n${join("\n", local.long_names)}"
   }
 
   precondition {

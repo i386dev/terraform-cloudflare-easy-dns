@@ -1103,3 +1103,13 @@ run "fqdn_of_253_characters" {
     error_message = "A name of 253 characters is valid"
   }
 }
+
+# The alias target combines the prefix, the name and the zone: 267 characters
+run "alias_target_over_253_characters" {
+  command = plan
+  variables {
+    records = { "${join("", [for i in range(63) : "a"])}.${join("", [for i in range(63) : "a"])}.${join("", [for i in range(63) : "a"])}" = { "${join("", [for i in range(63) : "a"])}.ALIASES" = [{ content = "www" }] } }
+  }
+  expect_failures = [output.flat_records]
+}
+

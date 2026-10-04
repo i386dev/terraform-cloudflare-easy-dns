@@ -66,6 +66,8 @@ INVALID = {
     "unquoted boolean in tags": 'records: { app: { A: [{ content: 192.0.2.10, tags: [off] }] } }',
     "fractional TTL": 'records: { app: { A: [{ content: 192.0.2.10, ttl: 60.5 }] } }',
     "fractional priority": 'records: { "@": { MX: [{ content: mail.example.com, priority: 10.5 }] } }',
+    "priority over 16 bits": 'records: { "@": { MX: [{ content: mail.example.com, priority: 65536 }] } }',
+    "negative URI priority": 'records: { _ftp._tcp: { URI: [{ priority: -1, data: { weight: 1, target: "ftp://x/" } }] } }',
 }
 
 # Documents that only the module can reject: the checks compare records with each other

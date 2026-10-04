@@ -401,7 +401,7 @@ The `records` input is validated before any API call. The module checks the stru
 - `target` of `SRV`, `HTTPS` and `SVCB` records and `replacement` of `NAPTR` records must be a DNS name by the same rule, or `.` (no service for `SRV`, the owner name for `HTTPS` and `SVCB`, no replacement for `NAPTR`). `@` is not accepted there: the module passes `data` to Cloudflare as written. `URI` targets are URIs and are not checked
 - `TXT` values are limited to 2048 characters
 - Names, prefixes and `ALIASES` must be valid DNS names: labels of letters, digits, `_` and `-` separated by dots. Internationalized names, also in `zone_name`, must be given in Punycode (`xn--mnchen-3ya` for `münchen`), as the Cloudflare API expects them
-- The fully qualified name of a record (prefix, name and zone together) can have at most 253 characters
+- The fully qualified name of a record (prefix, name and zone together) can have at most 253 characters, and so can the target of a prefixed `ALIASES`
 - A wildcard `*` must be the whole leftmost label, also in the names a prefix and a base name combine into (`"_acme-challenge.TXT"` under `"*"` would give `_acme-challenge.*`) and in the targets of `<prefix>.ALIASES`
 - A `CNAME` or alias cannot point to its own name (case, a trailing dot, `@` and the short form do not matter)
 - `CAA` records require `tag`: `issue`, `issuewild` or `iodef`

@@ -9,8 +9,8 @@ All notable changes to this project are documented in this file. The format is b
 ### Fixed
 
 - With `import_existing`, one existing record could be imported into two addresses: configured records that differ only in `priority` (MX `primary` and `backup` with the same server) both matched the one MX record in the zone, and both got its ID. An existing record now goes to one address only: to the record with the same priority, while the others are created; without such a record, none of them is imported, and they are listed in `import_duplicates` with the plan warning
-- Fractional TTLs (`ttl = 60.5`, `default_ttl = 3600.5`) and priorities passed the validation, which the JSON schema rejects; TTLs and priorities must now be whole numbers, priorities from 0 to 65535
-- The length of the fully qualified name was not checked: a prefix, a name and the zone that are valid on their own could combine into more than 253 characters; such names now fail at `plan`
+- Fractional TTLs (`ttl = 60.5`, `default_ttl = 3600.5`) and priorities passed the validation, which the JSON schema rejects; TTLs and priorities must now be whole numbers, priorities from 0 to 65535 (also in the JSON schema)
+- The length of the fully qualified name was not checked: a prefix, a name and the zone that are valid on their own could combine into more than 253 characters, also in the target of a prefixed `ALIASES`; such names and targets now fail at `plan`
 - `tags` given as a set in HCL (`toset([false])`, `toset([123])`) skipped the checks for booleans and numbers, which looked tags up by index
 
 ### Changed
@@ -19,7 +19,7 @@ All notable changes to this project are documented in this file. The format is b
 
 ### Internal
 
-- Tests: one existing record and records that differ in priority (matching, other and unknown priority), fractional TTL, `default_ttl` and priority, priority over 16 bits, names of 253 and 267 characters, sets of tags; schema parity documents for fractional TTL and priority and a name over 253 characters
+- Tests: one existing record and records that differ in priority (matching, other and unknown priority), fractional TTL, `default_ttl` and priority, priority over 16 bits, names of 253 and 267 characters and an alias target of 267, sets of tags; schema parity documents for fractional TTL and priority, priorities out of range and a name over 253 characters
 
 ## [2.10.3] - 2026-10-04
 
