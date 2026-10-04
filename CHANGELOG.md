@@ -4,6 +4,8 @@ All notable changes to this project are documented in this file. The format is b
 
 ## [Unreleased]
 
+## [2.10.4] - 2026-10-04
+
 ### Fixed
 
 - With `import_existing`, one existing record could be imported into two addresses: configured records that differ only in `priority` (MX `primary` and `backup` with the same server) both matched the one MX record in the zone, and both got its ID. An existing record now goes to one address only: to the record with the same priority, while the others are created; without such a record, none of them is imported, and they are listed in `import_duplicates` with the plan warning
@@ -328,7 +330,8 @@ All notable changes to this project are documented in this file. The format is b
 - Inline aliases pointed to a relative name instead of the full hostname
 - Zone apex (`@`) handling for aliases and nested names
 
-[Unreleased]: https://github.com/i386dev/terraform-cloudflare-easy-dns/compare/v2.10.3...HEAD
+[Unreleased]: https://github.com/i386dev/terraform-cloudflare-easy-dns/compare/v2.10.4...HEAD
+[2.10.4]: https://github.com/i386dev/terraform-cloudflare-easy-dns/compare/v2.10.3...v2.10.4
 [2.10.3]: https://github.com/i386dev/terraform-cloudflare-easy-dns/compare/v2.10.2...v2.10.3
 [2.10.2]: https://github.com/i386dev/terraform-cloudflare-easy-dns/compare/v2.10.1...v2.10.2
 [2.10.1]: https://github.com/i386dev/terraform-cloudflare-easy-dns/compare/v2.10.0...v2.10.1
