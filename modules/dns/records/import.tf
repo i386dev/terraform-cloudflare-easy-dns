@@ -33,7 +33,8 @@ locals {
   # Record types whose content is not a hostname or an address
   exact_content_types = ["OPENPGPKEY"]
 
-  # Fields of structured records that hold hostnames or hex strings
+  # Fields of structured records that hold hostnames or hex strings (the target of a
+  # URI record is a URI, compared exactly: paths and queries are case-sensitive)
   case_insensitive_fields = ["target", "replacement", "digest", "fingerprint"]
 
   # CAA issue/issuewild values are "<issuer domain>[; parameters]": the domain is
@@ -64,7 +65,7 @@ locals {
         )
         : alltrue([
           for field, value in rec.data : (
-            contains(local.case_insensitive_fields, field) || (field == "certificate" && contains(["TLSA", "SMIMEA"], rec.type))
+            (contains(local.case_insensitive_fields, field) && !(field == "target" && rec.type == "URI")) || (field == "certificate" && contains(["TLSA", "SMIMEA"], rec.type))
             ? lower(trimsuffix(lookup(e.data, field, ""), ".")) == lower(trimsuffix(value, "."))
             : rec.type == "CAA" && field == "value" && contains(local.caa_issuer_tags, lookup(rec.data, "tag", ""))
             ? format("%s%s", lower(trimsuffix(trimspace(split(";", lookup(e.data, field, ""))[0]), ".")), substr(lookup(e.data, field, ""), length(split(";", lookup(e.data, field, ""))[0]), -1))

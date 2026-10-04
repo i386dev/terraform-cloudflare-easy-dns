@@ -314,3 +314,28 @@ run "empty_root_domain" {
 
   expect_failures = [var.root_domain]
 }
+
+# Cloudflare returns the name of an internationalized zone in Unicode
+run "unicode_root_domain" {
+  command = plan
+
+  variables {
+    root_domain = "münchen.de"
+  }
+
+  expect_failures = [var.root_domain]
+}
+
+run "punycode_root_domain" {
+  command = plan
+
+  variables {
+    root_domain = "xn--mnchen-3ya.de"
+    records     = { "www" = { A = [{ content = "192.0.2.1" }] } }
+  }
+
+  assert {
+    condition     = output.flat_records["www A 192.0.2.1"].fqdn == "www.xn--mnchen-3ya.de"
+    error_message = "A zone name in Punycode gives fully qualified names in Punycode"
+  }
+}

@@ -1038,3 +1038,22 @@ run "default_ttl_30_on_enterprise" {
     error_message = "default_ttl 30 is fine with minimum_ttl = 30"
   }
 }
+
+run "null_mx_with_priority_0" {
+  command = plan
+  variables {
+    records = { "@" = { MX = [{ content = ".", priority = 0 }] } }
+  }
+  assert {
+    condition     = output.flat_records["@ MX ."].priority == 0
+    error_message = "A null MX with priority 0 is valid"
+  }
+}
+
+run "null_mx_with_another_priority" {
+  command = plan
+  variables {
+    records = { "@" = { MX = [{ content = ".", priority = 10 }] } }
+  }
+  expect_failures = [var.records]
+}

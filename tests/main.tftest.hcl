@@ -71,6 +71,38 @@ run "unicode_zone_name" {
   expect_failures = [var.zone_name]
 }
 
+run "yaml_booleans_in_tags" {
+  command = plan
+
+  variables {
+    records = yamldecode(<<-YAML
+      app:
+        A:
+          - content: 192.0.2.1
+            tags: [N]
+    YAML
+    )
+  }
+
+  expect_failures = [var.records]
+}
+
+# A module call may pass optional inputs through as null; null means the default
+run "null_defaults" {
+  command = plan
+
+  variables {
+    default_ttl     = null
+    default_proxied = null
+    default_tags    = null
+  }
+
+  assert {
+    condition     = length(output.record_names) == 3
+    error_message = "null defaults are passed to the v5 wrapper as the defaults"
+  }
+}
+
 # The same document as the schema tests, through yamldecode like a dns.yaml
 run "yaml_all_types" {
   command = plan

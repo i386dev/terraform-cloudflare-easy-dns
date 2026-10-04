@@ -64,3 +64,24 @@ run "invalid_default_ttl" {
 
   expect_failures = [var.default_ttl]
 }
+
+# A module call may pass optional inputs through as null; null means the default
+run "null_defaults" {
+  command = plan
+
+  variables {
+    default_ttl     = null
+    default_proxied = null
+    default_tags    = null
+  }
+
+  assert {
+    condition     = output.flat_records["app A 192.0.2.1"].ttl == 3600 && output.flat_records["app A 192.0.2.1"].proxied == false
+    error_message = "null default_ttl and default_proxied mean 3600 and false"
+  }
+
+  assert {
+    condition     = length(output.flat_records["app TXT ${substr(sha1("v=spf1 -all"), 0, 12)}"].tags) == 0
+    error_message = "null default_tags means no tags"
+  }
+}

@@ -1,5 +1,8 @@
 locals {
   root_domain = coalesce(var.zone_name, try(data.cloudflare_zone.this[0].name, null))
+
+  # Fields of data that hold text (the other fields are numbers or N/S, E/W)
+  text_data_fields = ["certificate", "digest", "fingerprint", "public_key", "regex", "replacement", "service", "target", "value"]
 }
 
 module "records" {
@@ -19,6 +22,15 @@ module "records" {
 data "cloudflare_zone" "this" {
   count   = var.zone_name == null ? 1 : 0
   zone_id = var.zone_id
+
+  lifecycle {
+    # Cloudflare returns the name of an internationalized zone in Unicode, while
+    # record names come back in Punycode
+    postcondition {
+      condition     = !can(regex("[^[:ascii:]]", self.name))
+      error_message = "The zone ${jsonencode(self.name)} has an internationalized name, which Cloudflare returns in Unicode: set zone_name in Punycode (xn--mnchen-3ya.de for münchen.de)."
+    }
+  }
 }
 
 resource "cloudflare_dns_record" "record" {
@@ -80,26 +92,40 @@ resource "cloudflare_dns_record" "record" {
 }
 
 # Numbers in text values are written in their canonical form ("0123" -> "123",
-# "1.10" -> "1.1"), which loses what was written in YAML; quoting keeps it
+# "1.10" -> "1.1"), which loses what was written in YAML; quoting keeps it. The text
+# fields of data are checked too (a hex digest of digits loses its leading zeros);
+# numeric fields such as port or priority may be numbers
 check "records_text_values_are_strings" {
   assert {
     condition = alltrue(flatten([
       for name, types in var.records : [
         for type, list in types : [
-          for record in list : [
+          for record in list : concat(
             # fine: a JSON string, or a value that is not a number
-            for attribute in ["content", "key", "comment", "tag"] : startswith(jsonencode(try(record[attribute], "")), "\"") || !can(tonumber(try(record[attribute], "")))
-          ]
+            [for attribute in ["content", "key", "comment", "tag"] : startswith(jsonencode(try(record[attribute], "")), "\"") || !can(tonumber(try(record[attribute], "")))],
+            [for field in setintersection(try(keys(record.data), []), local.text_data_fields) : startswith(jsonencode(try(record.data[field], "")), "\"") || !can(tonumber(try(record.data[field], "")))],
+            [for index in try(range(length(record.tags)), []) : startswith(jsonencode(try(record.tags[index], "")), "\"") || !can(tonumber(try(record.tags[index], "")))],
+          )
         ]
       ]
     ]))
     error_message = "Text values given as numbers are written in their canonical form (0123 -> 123, 1.10 -> 1.1); in YAML quote them to keep them as written:\n${join("\n", flatten([
       for name, types in var.records : [
         for type, list in types : [
-          for index, record in list : [
-            for attribute in ["content", "key", "comment", "tag"] : "records[\"${name}\"][\"${type}\"][${index}].${attribute} is ${jsonencode(record[attribute])}"
-            if !startswith(jsonencode(try(record[attribute], "")), "\"") && can(tonumber(try(record[attribute], "")))
-          ]
+          for index, record in list : concat(
+            [
+              for attribute in ["content", "key", "comment", "tag"] : "records[\"${name}\"][\"${type}\"][${index}].${attribute} is ${jsonencode(record[attribute])}"
+              if !startswith(jsonencode(try(record[attribute], "")), "\"") && can(tonumber(try(record[attribute], "")))
+            ],
+            [
+              for field in setintersection(try(keys(record.data), []), local.text_data_fields) : "records[\"${name}\"][\"${type}\"][${index}].data.${field} is ${jsonencode(try(record.data[field], ""))}"
+              if !startswith(jsonencode(try(record.data[field], "")), "\"") && can(tonumber(try(record.data[field], "")))
+            ],
+            [
+              for tag_index in try(range(length(record.tags)), []) : "records[\"${name}\"][\"${type}\"][${index}].tags[${tag_index}] is ${jsonencode(try(record.tags[tag_index], ""))}"
+              if !startswith(jsonencode(try(record.tags[tag_index], "")), "\"") && can(tonumber(try(record.tags[tag_index], "")))
+            ],
+          )
         ]
       ]
     ]))}"

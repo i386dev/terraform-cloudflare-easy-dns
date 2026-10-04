@@ -43,7 +43,7 @@ Manages DNS records with `cloudflare_dns_record`. See the [main README](https://
 | <a name="input_minimum_ttl"></a> [minimum\_ttl](#input\_minimum\_ttl) | Lowest TTL other than 1 (automatic). Cloudflare accepts TTLs below 60 seconds only on Enterprise zones: set 30 there, keep 60 otherwise | `number` | `60` | no |
 | <a name="input_records"></a> [records](#input\_records) | DNS records: `records[NAME][TYPE] = [RECORD, ...]`, where NAME is a name within the<br/>zone (`@` for the apex) and TYPE a record type, optionally with a prefix<br/>(`"_acme-challenge.TXT"`). Record attributes: `content`, `ttl`, `proxied`, `priority`,<br/>`tag`, `flags`, `data`, `key`, `comment`, `tags` and `settings` (`flatten_cname`,<br/>`ipv4_only`, `ipv6_only`). See the README for the details. Unknown attributes fail at plan. | `any` | n/a | yes |
 | <a name="input_zone_id"></a> [zone\_id](#input\_zone\_id) | Cloudflare Zone ID | `string` | n/a | yes |
-| <a name="input_zone_name"></a> [zone\_name](#input\_zone\_name) | Zone domain name (e.g. example.com). If null, it is looked up from zone\_id. A trailing dot is ignored | `string` | `null` | no |
+| <a name="input_zone_name"></a> [zone\_name](#input\_zone\_name) | Zone domain name (e.g. example.com). If null, it is looked up from zone\_id. A trailing dot is ignored. Internationalized zones must set it, in Punycode | `string` | `null` | no |
 
 ## Outputs
 

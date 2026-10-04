@@ -121,10 +121,15 @@ def schema():
         "PTR": record({"content": hostname("Hostname", "@")}, ["content"], "PTR record"),
         "TXT": record({"content": {"description": "Text value", "type": "string", "maxLength": 2048}}, ["content"], "TXT record"),
         "OPENPGPKEY": record({"content": {"description": "Public key", "type": "string"}}, ["content"], "OPENPGPKEY record (provider v5 only)"),
-        "MX": record(
-            {"content": hostname("Mail server hostname, . for a null MX (RFC 7505)", "@", "."), "priority": {"description": "Priority, lower is preferred", "type": "integer"}},
-            ["content", "priority"], "MX record",
-        ),
+        "MX": {
+            **record(
+                {"content": hostname("Mail server hostname, . for a null MX (RFC 7505)", "@", "."), "priority": {"description": "Priority, lower is preferred (0 for a null MX)", "type": "integer"}},
+                ["content", "priority"], "MX record",
+            ),
+            # A null MX (RFC 7505) has preference 0
+            "if": {"properties": {"content": {"const": "."}}, "required": ["content"]},
+            "then": {"properties": {"priority": {"const": 0}}},
+        },
         "CAA": record(
             {
                 "content": {"description": "Value, e.g. letsencrypt.org", "type": "string"},

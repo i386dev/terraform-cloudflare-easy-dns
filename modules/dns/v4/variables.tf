@@ -4,7 +4,7 @@ variable "zone_id" {
 }
 
 variable "zone_name" {
-  description = "Zone domain name (e.g. example.com). If null, it is looked up from zone_id. A trailing dot is ignored"
+  description = "Zone domain name (e.g. example.com). If null, it is looked up from zone_id. A trailing dot is ignored. Internationalized zones must set it, in Punycode"
   type        = string
   default     = null
 
@@ -12,7 +12,7 @@ variable "zone_name" {
   # A non-ASCII name gets its own error, since the DNS name rule does not say why it fails
   validation {
     condition     = var.zone_name == null || !can(regex("[^[:ascii:]]", var.zone_name))
-    error_message = "zone_name must be in Punycode, as the Cloudflare API expects it (xn--mnchen-3ya.de for münchen.de), or null to look it up from zone_id."
+    error_message = "zone_name must be in Punycode (xn--mnchen-3ya.de for münchen.de). An internationalized zone needs it set: Cloudflare returns the names of such zones in Unicode, so they cannot be looked up from zone_id."
   }
 
   validation {
@@ -62,14 +62,17 @@ variable "records" {
     )
   }
   # YAML 1.1 reads unquoted off/on/yes/no/N/Y as booleans, and Terraform would turn them
-  # into "false"/"true" without an error; values that must be text cannot be booleans
+  # into "false"/"true" without an error; values that must be text cannot be booleans.
+  # An unquoted N is accepted as a LOC lat_direction, where it can only mean north
   validation {
     condition = try(alltrue(flatten([
       for name, types in var.records : [
         for type, list in types : [
-          for record in list : [
-            for attribute in ["content", "key", "comment", "tag"] : !contains(["true", "false"], jsonencode(try(record[attribute], "")))
-          ]
+          for record in list : concat(
+            [for attribute in ["content", "key", "comment", "tag"] : !contains(["true", "false"], jsonencode(try(record[attribute], "")))],
+            [for field in try(keys(record.data), []) : !contains(["true", "false"], jsonencode(try(record.data[field], ""))) || (field == "lat_direction" && jsonencode(try(record.data[field], "")) == "false")],
+            [for index in try(range(length(record.tags)), []) : !contains(["true", "false"], jsonencode(try(record.tags[index], "")))],
+          )
         ]
       ]
     ])), true)
@@ -77,10 +80,20 @@ variable "records" {
       "Text values must be strings, in YAML quote them (\"off\", \"yes\", \"N\"); unquoted they are read as booleans:\n${join("\n", flatten([
         for name, types in var.records : [
           for type, list in types : [
-            for index, record in list : [
-              for attribute in ["content", "key", "comment", "tag"] : "records[\"${name}\"][\"${type}\"][${index}].${attribute} is ${jsonencode(record[attribute])}"
-              if contains(["true", "false"], jsonencode(try(record[attribute], "")))
-            ]
+            for index, record in list : concat(
+              [
+                for attribute in ["content", "key", "comment", "tag"] : "records[\"${name}\"][\"${type}\"][${index}].${attribute} is ${jsonencode(record[attribute])}"
+                if contains(["true", "false"], jsonencode(try(record[attribute], "")))
+              ],
+              [
+                for field in try(keys(record.data), []) : "records[\"${name}\"][\"${type}\"][${index}].data.${field} is ${jsonencode(try(record.data[field], ""))}"
+                if contains(["true", "false"], jsonencode(try(record.data[field], ""))) && !(field == "lat_direction" && jsonencode(try(record.data[field], "")) == "false")
+              ],
+              [
+                for tag_index in try(range(length(record.tags)), []) : "records[\"${name}\"][\"${type}\"][${index}].tags[${tag_index}] is ${jsonencode(try(record.tags[tag_index], ""))}"
+                if contains(["true", "false"], jsonencode(try(record.tags[tag_index], "")))
+              ],
+            )
           ]
         ]
       ]))}",
@@ -93,6 +106,7 @@ variable "default_ttl" {
   description = "TTL of records that do not set one (1 means automatic)"
   type        = number
   default     = 3600
+  nullable    = false
 
   validation {
     condition     = var.default_ttl == 1 || (var.default_ttl >= 30 && var.default_ttl <= 86400)
@@ -104,6 +118,7 @@ variable "default_proxied" {
   description = "Whether A, AAAA, CNAME and ALIASES records that do not set proxied are proxied by Cloudflare"
   type        = bool
   default     = false
+  nullable    = false
 }
 
 variable "default_comment" {
@@ -116,6 +131,7 @@ variable "default_tags" {
   description = "Tags added to all records, e.g. [\"managed-by:terraform\"] (tags require a Cloudflare plan that supports them)"
   type        = list(string)
   default     = []
+  nullable    = false
 }
 
 variable "allowed_cname_conflicts" {

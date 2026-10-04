@@ -121,7 +121,7 @@ Both wrappers share the same inputs, outputs and record keys, so switching betwe
 | `modules/dns/v4` | `>= 1.8.0` | `~> 4.41` |
 | `modules/dns/v5` | `>= 1.8.0` | `~> 5.26` |
 
-If `zone_name` is not set, the module looks up the zone by `zone_id`, so the API token needs the `Zone:Read` permission.
+If `zone_name` is not set, the module looks up the zone by `zone_id`, so the API token needs the `Zone:Read` permission. An internationalized zone (`münchen.de`) must set `zone_name` in Punycode (`xn--mnchen-3ya.de`): Cloudflare returns the names of such zones in Unicode, which cannot be used for the fully qualified names, so the lookup fails at `plan` with what to set.
 
 > **`zone_name` must be the name of the zone that `zone_id` refers to** (a trailing dot, as in zone files, is ignored). Setting it skips the lookup (no `Zone:Read` needed), and the module cannot check it: a wrong `zone_name` makes alias targets and fully qualified names point into another domain. Leave it unset when the token can read zones.
 
@@ -137,7 +137,7 @@ A copy in your repository needs neither GitHub nor the Terraform Registry to get
 
 ```sh
 REPO=https://github.com/i386dev/terraform-cloudflare-easy-dns
-VERSION=v2.10.2
+VERSION=v2.10.3
 ARCHIVE="terraform-cloudflare-easy-dns-${VERSION}.tar.gz"
 curl -fsSL -O "${REPO}/releases/download/${VERSION}/${ARCHIVE}"
 curl -fsSL -O "${REPO}/releases/download/${VERSION}/SHA256SUMS"
@@ -173,10 +173,10 @@ What a copy may change without affecting the module:
 To fetch the module on `terraform init` instead, use a Git source with a tag (or the URL of your own mirror):
 
 ```hcl
-source = "git::https://github.com/i386dev/terraform-cloudflare-easy-dns.git?ref=v2.10.2"
+source = "git::https://github.com/i386dev/terraform-cloudflare-easy-dns.git?ref=v2.10.3"
 ```
 
-For provider v4, add `//modules/dns/v4` before `?ref=`. In CI, where every run starts from a clean checkout, add `&depth=1` after the tag (`?ref=v2.10.2&depth=1`) to fetch only that commit instead of the whole history.
+For provider v4, add `//modules/dns/v4` before `?ref=`. In CI, where every run starts from a clean checkout, add `&depth=1` after the tag (`?ref=v2.10.3&depth=1`) to fetch only that commit instead of the whole history.
 
 ### HCL or YAML
 
@@ -330,8 +330,10 @@ Each record is keyed in the state by its content, in the zone file format `<name
 | Any record with `key` | `google._domainkey TXT dkim` |
 
 ```
-module.dns.cloudflare_record.record["app A 30.40.50.60"]
+module.dns.module.v5.cloudflare_dns_record.record["app A 30.40.50.60"]
 ```
+
+With the `v5` submodule the address is `module.dns.cloudflare_dns_record.record[...]`, with the `v4` submodule `module.dns.cloudflare_record.record[...]`.
 
 Since the value is a part of the key, changing it replaces the record. For values that change over time (e.g. DKIM rotation or a server IP), set an explicit `key`, so the record is updated in place:
 
@@ -395,14 +397,14 @@ The `records` input is validated before any API call. The module checks the stru
 - `ttl` and `default_ttl` must be `1` (automatic) or between `minimum_ttl` and `86400`. `minimum_ttl` is `60` by default: Cloudflare accepts TTLs below 60 seconds only on Enterprise zones, where it can be set to `30`. A lower TTL, and a `default_ttl` below `minimum_ttl` even if no record uses it, fail at `plan` with what to change; proxied records always get `1`
 - Only `A`, `AAAA`, `CNAME` and `ALIASES` records can be `proxied`
 - `MX` and `URI` records require `priority`
-- `A` records need an IPv4 address and `AAAA` records an IPv6 address; `CNAME`, `MX`, `NS` and `PTR` records need a hostname: labels of letters, digits, `_` and `-` (up to 63 characters) separated by dots, at most 253 characters, an optional trailing dot, and not an IP address (`@` stands for the zone apex, and `.` is a null `MX`, RFC 7505)
-- `target` of `SRV`, `HTTPS` and `SVCB` records and `replacement` of `NAPTR` records must be a hostname by the same rule, or `.` (no service for `SRV`, the owner name for `HTTPS` and `SVCB`, no replacement for `NAPTR`). `@` is not accepted there: the module passes `data` to Cloudflare as written. `URI` targets are URIs and are not checked
+- `A` records need an IPv4 address and `AAAA` records an IPv6 address; `CNAME`, `MX`, `NS` and `PTR` records need a DNS name: labels of letters, digits, `_` and `-` (up to 63 characters) separated by dots, at most 253 characters, an optional trailing dot, and not an IP address (`@` stands for the zone apex, and `.` is a null `MX`, RFC 7505, which must have `priority` 0)
+- `target` of `SRV`, `HTTPS` and `SVCB` records and `replacement` of `NAPTR` records must be a DNS name by the same rule, or `.` (no service for `SRV`, the owner name for `HTTPS` and `SVCB`, no replacement for `NAPTR`). `@` is not accepted there: the module passes `data` to Cloudflare as written. `URI` targets are URIs and are not checked
 - `TXT` values are limited to 2048 characters
 - Names, prefixes and `ALIASES` must be valid DNS names: labels of letters, digits, `_` and `-` separated by dots. Internationalized names, also in `zone_name`, must be given in Punycode (`xn--mnchen-3ya` for `münchen`), as the Cloudflare API expects them
 - A wildcard `*` must be the whole leftmost label, also in the names a prefix and a base name combine into (`"_acme-challenge.TXT"` under `"*"` would give `_acme-challenge.*`) and in the targets of `<prefix>.ALIASES`
 - A `CNAME` or alias cannot point to its own name (case, a trailing dot, `@` and the short form do not matter)
 - `CAA` records require `tag`: `issue`, `issuewild` or `iodef`
-- `key` must not contain whitespace
+- `key` must be a non-empty string without whitespace
 - Record keys must be unique. The error shows where each duplicate is defined, e.g. `"_acme-challenge.app TXT 79bead8e6d65" from records["_acme-challenge.app"]["TXT"][0] and records["app"]["_acme-challenge.TXT"][0]`
 - The same record must not be written twice with different name forms (`www` and `www.example.com`, `@` and the zone name), which would give it two keys; addresses and hostnames (`A`, `AAAA`, `MX`, `NS`, `PTR`) are compared case-insensitively and without a trailing dot
 - A `CNAME` (including `ALIASES`) cannot share its name with other records, except at the zone apex (`@` or the zone name) where Cloudflare uses CNAME flattening, and a name has at most one `CNAME`, also with different `key`s. Names are compared fully qualified, so `www` and `www.example.com` are the same name
@@ -446,6 +448,8 @@ Values that most records share can be set once for the module call, and overridd
 | `default_proxied` | Proxying of `A`, `AAAA`, `CNAME` and `ALIASES` records that do not set `proxied` (other types are never proxied) | `false` |
 | `default_comment` | Comment of records that do not set one | `null` |
 | `default_tags` | Tags added to the tags of every record | `[]` |
+
+`null` for `default_ttl`, `default_proxied` or `default_tags` means the default, so a module call that passes them through from optional inputs does not have to replace `null` itself.
 
 ```hcl
 module "dns" {
@@ -509,15 +513,13 @@ See [`examples/yaml`](https://github.com/i386dev/terraform-cloudflare-easy-dns/t
 
 Use the schema of the module version you use. For records written in HCL, there is no such completion (see [HCL or YAML](#hcl-or-yaml)); mistakes are reported at `plan`.
 
-**Quote text values.** `yamldecode` follows YAML 1.1, where unquoted `off`, `on`, `yes`, `no`, `N` and `Y` are booleans and `0123` or `1.10` are numbers; Terraform would turn them into `"false"`, `"123"` or `"1.1"` without an error. The module rejects booleans in `content`, `key`, `comment` and `tag`, and warns about numbers there. Quoted, they stay as written:
+**Quote text values.** `yamldecode` follows YAML 1.1, where unquoted `yes`, `no`, `on`, `off`, `y` and `n` (in any case) are booleans and `0123` or `1.10` are numbers; Terraform would turn them into `"false"`, `"123"` or `"1.1"` without an error. The module rejects booleans in `content`, `key`, `comment`, `tag`, `tags` and the fields of `data`, and warns about numbers in them (in `data`, only in the text fields such as `target`, `value` or `digest`; `port` or `priority` may be numbers). The unquoted `N` of a LOC `lat_direction` is accepted. Quoted, values stay as written:
 
 ```yaml
 TXT:
   - content: "off"     # not: content: off  ->  "false"
   - content: "0123"    # not: content: 0123 ->  "123"
 ```
-
-`yamldecode` follows YAML 1.1, where unquoted `yes`, `no`, `on`, `off`, `y` and `n` (in any case) are booleans; quote such values, e.g. `content: "on"`. The module accepts the unquoted `N` of a LOC `lat_direction`.
 
 ## Recipes
 
@@ -618,7 +620,7 @@ Each lookup reads up to 10,000 records of one type; in a zone with more records 
 
 For structured records (`SRV`, `HTTPS`, `TLSA`, ...), provider v5 plans a one-time in-place update right after the import, without visible changes; after the `apply`, the plan is empty.
 
-Matching ignores the case and a trailing dot of names, hostnames (`target`, `replacement`, the issuer domain of CAA `issue`/`issuewild` values) and hex values (`digest`, `fingerprint`, and `certificate` of TLSA and SMIMEA records); other `data` fields, CAA parameters after `;`, `iodef` URLs and OPENPGPKEY keys must match exactly. TXT values are compared without the split into quoted chunks; a value in the zone file form (`"v=spf1 \"a\" -all"`) is compared without its surrounding quotes and escapes, since Cloudflare stores TXT content as it was sent and `v=spf1 "a" -all` is the same DNS record; quotes inside the value count. A TXT record stored in the quoted form and configured without quotes gets a one-time in-place update to the configured form after the import (the DNS answer does not change). A record is imported only when exactly one existing record matches it: when the zone has several identical records, the record is not imported and `plan` shows it as created, so the duplicates can be cleaned up first. Such records are listed in the `import_duplicates` output with the IDs of all their matches, and `plan` shows a warning with the same list; [`examples/import`](https://github.com/i386dev/terraform-cloudflare-easy-dns/tree/main/examples/import) passes the output through so it shows up in `plan`.
+Matching ignores the case and a trailing dot of names, hostnames (`target`, `replacement`, the issuer domain of CAA `issue`/`issuewild` values) and hex values (`digest`, `fingerprint`, and `certificate` of TLSA and SMIMEA records); other `data` fields (also the `target` of URI records, whose paths are case-sensitive), CAA parameters after `;`, `iodef` URLs and OPENPGPKEY keys must match exactly. TXT values are compared without the split into quoted chunks; a value in the zone file form (`"v=spf1 \"a\" -all"`) is compared without its surrounding quotes and escapes, since Cloudflare stores TXT content as it was sent and `v=spf1 "a" -all` is the same DNS record; quotes inside the value count. A TXT record stored in the quoted form and configured without quotes gets a one-time in-place update to the configured form after the import (the DNS answer does not change). A record is imported only when exactly one existing record matches it: when the zone has several identical records, the record is not imported and `plan` shows it as created, so the duplicates can be cleaned up first. Such records are listed in the `import_duplicates` output with the IDs of all their matches, and `plan` shows a warning with the same list; [`examples/import`](https://github.com/i386dev/terraform-cloudflare-easy-dns/tree/main/examples/import) passes the output through so it shows up in `plan`.
 
 ## Upgrading and Migration
 

@@ -297,3 +297,150 @@ run "zone_name_with_a_trailing_dot" {
     error_message = "A trailing dot and the case of zone_name do not change the names"
   }
 }
+
+# Cloudflare returns the name of an internationalized zone in Unicode (checked against
+# the API on a pending zone münchen.de); the lookup then fails with what to set
+run "unicode_zone_lookup" {
+  command = plan
+
+  override_data {
+    target = data.cloudflare_zone.this[0]
+    values = { name = "münchen.de" }
+  }
+
+  variables {
+    zone_name = null
+  }
+
+  expect_failures = [data.cloudflare_zone.this]
+}
+
+run "punycode_zone_name" {
+  command = plan
+
+  variables {
+    zone_name = "xn--mnchen-3ya.de"
+    records   = { "www" = { A = [{ content = "192.0.2.1" }] } }
+  }
+
+  assert {
+    condition     = module.records.flat_records["www A 192.0.2.1"].fqdn == "www.xn--mnchen-3ya.de"
+    error_message = "A zone name in Punycode gives fully qualified names in Punycode"
+  }
+}
+
+run "yaml_booleans_in_data" {
+  command = plan
+
+  variables {
+    records = yamldecode(<<-YAML
+      svc:
+        SVCB:
+          - data: { priority: 1, target: ".", value: off }
+    YAML
+    )
+  }
+
+  expect_failures = [var.records]
+}
+
+run "yaml_booleans_in_tags" {
+  command = plan
+
+  variables {
+    records = yamldecode(<<-YAML
+      app:
+        A:
+          - content: 192.0.2.1
+            tags: [N]
+    YAML
+    )
+  }
+
+  expect_failures = [var.records]
+}
+
+run "yaml_unquoted_n_as_loc_lat_direction" {
+  command = plan
+
+  variables {
+    records = yamldecode(<<-YAML
+      office:
+        LOC:
+          - data: { lat_degrees: 52, lat_minutes: 22, lat_seconds: 23, lat_direction: N, long_degrees: 4, long_minutes: 53, long_seconds: 32, long_direction: E, altitude: 0, size: 1, precision_horz: 10000, precision_vert: 10 }
+    YAML
+    )
+  }
+
+  assert {
+    condition     = one([for r in module.records.flat_records : r.data.lat_direction if r.type == "LOC"]) == "N"
+    error_message = "An unquoted N is north in a LOC lat_direction"
+  }
+}
+
+run "yaml_numbers_in_data_text_fields" {
+  command = plan
+
+  variables {
+    records = yamldecode(<<-YAML
+      "@":
+        DS:
+          - data: { key_tag: 2371, algorithm: 13, digest_type: 2, digest: 0123 }
+    YAML
+    )
+  }
+
+  expect_failures = [check.records_text_values_are_strings]
+}
+
+run "yaml_numbers_in_tags" {
+  command = plan
+
+  variables {
+    records = yamldecode(<<-YAML
+      app:
+        A:
+          - content: 192.0.2.1
+            tags: [0123]
+    YAML
+    )
+  }
+
+  expect_failures = [check.records_text_values_are_strings]
+}
+
+# Numeric fields of data may be numbers: no warning
+run "yaml_numbers_in_numeric_data_fields" {
+  command = plan
+
+  variables {
+    records = yamldecode(<<-YAML
+      _sip._tcp:
+        SRV:
+          - data: { priority: 10, weight: 5, port: 5060, target: sip.example.com }
+    YAML
+    )
+  }
+
+  assert {
+    condition     = length(module.records.flat_records) == 1
+    error_message = "SRV with numeric fields"
+  }
+}
+
+# A module call may pass optional inputs through as null; null means the default
+run "null_defaults" {
+  command = plan
+
+  variables {
+    default_ttl     = null
+    default_proxied = null
+    default_tags    = null
+    records         = { "app" = { A = [{ content = "192.0.2.1" }] } }
+  }
+
+  assert {
+    condition     = module.records.flat_records["app A 192.0.2.1"].ttl == 3600 && module.records.flat_records["app A 192.0.2.1"].proxied == false && length(module.records.flat_records["app A 192.0.2.1"].tags) == 0
+    error_message = "null defaults mean 3600, false and no tags"
+  }
+}
