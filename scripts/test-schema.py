@@ -21,6 +21,8 @@ validator = Draft7Validator(json.loads((ROOT / "schema/records.schema.json").rea
 
 VALID = {
     "all record types (tests/fixtures/all-types.yaml)": (ROOT / "tests/fixtures/all-types.yaml").read_text(),
+    "null MX": 'records: { "@": { MX: [{ content: ".", priority: 0 }] } }',
+    "unquoted N as LOC lat_direction": 'records: { o: { LOC: [{ data: { lat_degrees: 1, lat_minutes: 1, lat_seconds: 1, lat_direction: N, long_degrees: 1, long_minutes: 1, long_seconds: 1, long_direction: E } }] } }',
     "numbers as strings in data": """
 records:
   _sip._tcp:
@@ -59,6 +61,9 @@ INVALID = {
     "SRV target with a space": 'records: { _sip._tcp: { SRV: [{ data: { priority: 1, weight: 1, port: 1, target: "a b" } }] } }',
     "HTTPS target @": 'records: { "@": { HTTPS: [{ data: { priority: 1, target: "@" } }] } }',
     "NAPTR replacement URL": 'records: { sip: { NAPTR: [{ data: { order: 1, preference: 1, replacement: "http://x/" } }] } }',
+    "null MX with a priority other than 0": 'records: { "@": { MX: [{ content: ".", priority: 10 }] } }',
+    "unquoted boolean in data": 'records: { svc: { SVCB: [{ data: { priority: 1, target: ".", value: off } }] } }',
+    "unquoted boolean in tags": 'records: { app: { A: [{ content: 192.0.2.10, tags: [off] }] } }',
 }
 
 # Documents that only the module can reject: the checks compare records with each other

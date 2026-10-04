@@ -796,8 +796,25 @@
           ]
         },
         "priority": {
-          "description": "Priority, lower is preferred",
+          "description": "Priority, lower is preferred (0 for a null MX)",
           "type": "integer"
+        }
+      },
+      "if": {
+        "properties": {
+          "content": {
+            "const": "."
+          }
+        },
+        "required": [
+          "content"
+        ]
+      },
+      "then": {
+        "properties": {
+          "priority": {
+            "const": 0
+          }
         }
       }
     },

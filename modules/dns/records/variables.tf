@@ -2,8 +2,15 @@ variable "root_domain" {
   description = "Zone domain name (e.g. example.com), used as the target suffix for aliases. A trailing dot is ignored"
   type        = string
 
+  # Cloudflare returns the name of an internationalized zone in Unicode (münchen.de),
+  # while record names come back in Punycode; such zones need zone_name in Punycode
   validation {
-    condition     = can(regex("^[A-Za-z0-9_]([A-Za-z0-9_-]{0,61}[A-Za-z0-9_])?(\\.[A-Za-z0-9_]([A-Za-z0-9_-]{0,61}[A-Za-z0-9_])?)*\\.?$", var.root_domain))
+    condition     = !can(regex("[^[:ascii:]]", var.root_domain))
+    error_message = "The zone name ${jsonencode(var.root_domain)} is not in Punycode: Cloudflare returns the names of internationalized zones in Unicode, so set zone_name in Punycode (xn--mnchen-3ya.de for münchen.de)."
+  }
+
+  validation {
+    condition     = can(regex("[^[:ascii:]]", var.root_domain)) || can(regex("^[A-Za-z0-9_]([A-Za-z0-9_-]{0,61}[A-Za-z0-9_])?(\\.[A-Za-z0-9_]([A-Za-z0-9_-]{0,61}[A-Za-z0-9_])?)*\\.?$", var.root_domain))
     error_message = "The zone name must be a DNS name such as example.com, got ${jsonencode(var.root_domain)}."
   }
 }
@@ -12,6 +19,7 @@ variable "default_ttl" {
   description = "TTL of records that do not set one (1 means automatic)"
   type        = number
   default     = 3600
+  nullable    = false
 
   validation {
     condition     = var.default_ttl == 1 || (var.default_ttl >= 30 && var.default_ttl <= 86400)
@@ -23,6 +31,7 @@ variable "default_proxied" {
   description = "Whether A, AAAA, CNAME and ALIASES records that do not set proxied are proxied by Cloudflare"
   type        = bool
   default     = false
+  nullable    = false
 }
 
 variable "default_comment" {
@@ -35,6 +44,7 @@ variable "default_tags" {
   description = "Tags added to all records, e.g. [\"managed-by:terraform\"] (tags require a Cloudflare plan that supports them)"
   type        = list(string)
   default     = []
+  nullable    = false
 }
 
 variable "minimum_ttl" {
@@ -329,6 +339,30 @@ variable "records" {
             for idx, rec in recs : "records[\"${base_name}\"][\"${raw_key}\"][${idx}]"
             if rec.priority == null
           ] if contains(["MX", "URI"], kind)
+        ]
+      ]
+    ]))}"
+  }
+
+  # A null MX (RFC 7505) is "." with preference 0
+  validation {
+    condition = length(flatten([
+      for base_name, type_map in var.records : [
+        for raw_key, recs in type_map : [
+          for kind in [element(split(".", raw_key), length(split(".", raw_key)) - 1)] : [
+            for idx, rec in recs : "records[\"${base_name}\"][\"${raw_key}\"][${idx}]"
+            if rec.content == "." && rec.priority != null && rec.priority != 0
+          ] if kind == "MX"
+        ]
+      ]
+    ])) == 0
+    error_message = "A null MX (content \".\", RFC 7505) must have priority 0:\n${join("\n", flatten([
+      for base_name, type_map in var.records : [
+        for raw_key, recs in type_map : [
+          for kind in [element(split(".", raw_key), length(split(".", raw_key)) - 1)] : [
+            for idx, rec in recs : "records[\"${base_name}\"][\"${raw_key}\"][${idx}]: priority ${rec.priority}"
+            if rec.content == "." && rec.priority != null && rec.priority != 0
+          ] if kind == "MX"
         ]
       ]
     ]))}"

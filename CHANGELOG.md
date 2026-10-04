@@ -4,6 +4,25 @@ All notable changes to this project are documented in this file. The format is b
 
 ## [Unreleased]
 
+### Fixed
+
+- Internationalized zones: Cloudflare returns the name of such a zone in Unicode (`münchen.de`), while record names come back in Punycode, so a zone looked up by `zone_id` failed at `plan` with "The zone name must be a DNS name". The lookup now fails with a message to set `zone_name` in Punycode (`xn--mnchen-3ya.de`), and the error for a non-ASCII `zone_name` added in 2.10.2 no longer suggests leaving it unset (root module and both wrappers)
+- Unquoted YAML booleans in `tags` and in the fields of `data` (`value: off`, `tags: [yes]`) were sent as `"false"` and `"true"`; they are now rejected like in `content`, `key`, `comment` and `tag`. In YAML, quote them. The unquoted `N` of a LOC `lat_direction` is still accepted
+- Unquoted YAML numbers in `tags` and in the text fields of `data` (`digest: 0123` is sent as `"123"`) now show the same warning as in `content`, `key`, `comment` and `tag`; numeric fields such as `port` or `priority` may still be numbers
+- An explicit `null` for `default_ttl`, `default_proxied` or `default_tags` failed with unclear errors; `null` now means the default (root module, both wrappers)
+- With `import_existing`, the `target` of URI records was compared case-insensitively, so a record could be matched to one whose path differs only in case; it is now compared exactly
+- A null `MX` (`"."`) with a priority other than 0 was accepted; RFC 7505 defines it with preference 0, and the module and the JSON schema now require it
+
+### Changed
+
+- README: internationalized zones need `zone_name` in Punycode; the record address in Record Keys is the one of the root module; "DNS name" instead of "hostname" in the validation rules, as in the errors; `key` must be non-empty; the two paragraphs about YAML booleans are merged; `null` defaults
+
+### Internal
+
+- CI checks the SHA256 of the downloaded `terraform-docs`
+- `scripts/check-sync.sh` compares all variables of the v4 and v5 wrappers (except `import_existing`) and their check of text values, not only `records`
+- Tests: Unicode and Punycode zone names (lookup and core), booleans and numbers in `data` and `tags`, the unquoted `N` of LOC, `null` defaults, null `MX` priority, exact URI target in import matching; schema parity documents for null `MX`, booleans in `data` and `tags`
+
 ## [2.10.2] - 2026-10-04
 
 ### Fixed

@@ -19,8 +19,17 @@ if [ "$(outputs modules/dns/v5/outputs.tf)" != "$(outputs outputs.tf)" ]; then
 fi
 
 records() { awk '/^variable "records"/, /^}/' "$1"; }
-if [ "$(records modules/dns/v4/variables.tf)" != "$(records modules/dns/v5/variables.tf)" ]; then
-    echo "The records variable differs between modules/dns/v4 and modules/dns/v5" >&2
+# The v4 wrapper has the variables of the v5 wrapper except import_existing (provider
+# v4 has no lookup of existing records)
+without_import() { awk '/^variable "import_existing"/ { skip = 1 } !skip { print } skip && /^}/ { skip = 0; getline }' "$1"; }
+if ! without_import modules/dns/v5/variables.tf | diff -u - modules/dns/v4/variables.tf; then
+    echo "The variables of modules/dns/v4 differ from modules/dns/v5 (other than import_existing)" >&2
+    status=1
+fi
+# Both wrappers check the text values of records the same way
+text_checks() { grep -E '^  text_data_fields' "$1"; awk '/^check "records_text_values_are_strings"/, /^}/' "$1"; }
+if [ "$(text_checks modules/dns/v4/main.tf)" != "$(text_checks modules/dns/v5/main.tf)" ]; then
+    echo "The check of text values differs between modules/dns/v4/main.tf and modules/dns/v5/main.tf" >&2
     status=1
 fi
 # The entry points accept records as any and check attribute names themselves; the

@@ -238,3 +238,25 @@ run "import_fully_qualified_base_name" {
     error_message = "Records with fully qualified and short base names must both be matched"
   }
 }
+
+run "import_uri_target_exact" {
+  command = plan
+
+  variables {
+    records = {
+      "_ftp._tcp" = {
+        URI = [{ key = "upper", priority = 10, data = { weight = 1, target = "ftp://ftp.example.com/Public" } }, { key = "lower", priority = 10, data = { weight = 1, target = "ftp://ftp.example.com/public" } }]
+      }
+    }
+    existing_records = [
+      # URI paths are case-sensitive: each configured record matches only its own target
+      { id = "id-upper", name = "_ftp._tcp.example.com", type = "URI", priority = 10, data = { weight = "1", target = "ftp://ftp.example.com/Public" } },
+      { id = "id-lower", name = "_ftp._tcp.example.com", type = "URI", priority = 10, data = { weight = "1", target = "ftp://ftp.example.com/public" } },
+    ]
+  }
+
+  assert {
+    condition     = output.import_record_ids == { "_ftp._tcp URI upper" = "id-upper", "_ftp._tcp URI lower" = "id-lower" }
+    error_message = "The target of URI records must be compared exactly"
+  }
+}
