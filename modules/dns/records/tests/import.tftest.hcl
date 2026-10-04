@@ -481,3 +481,28 @@ run "import_txt_chunks_with_escapes" {
     error_message = "Chunks must be joined and unescaped"
   }
 }
+
+# Only \" and \\ are unescaped: \065 (a decimal escape in zone files) stays as written
+run "import_txt_other_escapes_stay" {
+  command = plan
+
+  variables {
+    records = {
+      "app" = {
+        TXT = [
+          { content = "065", key = "digits" },
+          { content = "\\065", key = "escape" },
+        ]
+      }
+    }
+    existing_records = [
+      { id = "id-escape", name = "app.example.com", type = "TXT", content = "\"\\065\"" },
+    ]
+  }
+
+  assert {
+    condition     = output.import_record_ids == { "app TXT escape" = "id-escape" }
+    error_message = "A decimal escape must not be compared as its digits"
+  }
+}
+

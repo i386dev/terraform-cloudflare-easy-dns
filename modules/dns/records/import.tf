@@ -9,15 +9,16 @@ locals {
   # Cloudflare stores TXT content as it was sent, and v=spf1 "a" -all and
   # "v=spf1 \"a\" -all" are the same DNS record. A value in the zone file form
   # (one or more quoted chunks, "a" "b") is compared as its chunks joined, without
-  # the quotes and the escapes (\" and \\). Any other value is compared exactly,
-  # quotes included, so prefix" "suffix is not prefixsuffix.
+  # the quotes and the escapes \" and \\ (other escapes such as \065 stay as
+  # written). Any other value is compared exactly, quotes included, so
+  # prefix" "suffix is not prefixsuffix.
   txt_zone_file_form = "^\"(?:[^\"\\\\]|\\\\.)*\"(?:[ \\t]+\"(?:[^\"\\\\]|\\\\.)*\")*$"
   txt_chunk          = "\"((?:[^\"\\\\]|\\\\.)*)\""
   existing_txt = {
     for r in var.existing_records : r.id => (
       r.content == null ? "" :
       can(regex(local.txt_zone_file_form, r.content))
-      ? replace(join("", [for chunk in regexall(local.txt_chunk, r.content) : chunk[0]]), "/\\\\(.)/", "$1")
+      ? replace(join("", [for chunk in regexall(local.txt_chunk, r.content) : chunk[0]]), "/\\\\([\"\\\\])/", "$1")
       : r.content
     )
   }
@@ -51,7 +52,7 @@ locals {
   configured_txt = {
     for key, rec in local.flat_records : key => (
       can(regex(local.txt_zone_file_form, rec.content))
-      ? replace(join("", [for chunk in regexall(local.txt_chunk, rec.content) : chunk[0]]), "/\\\\(.)/", "$1")
+      ? replace(join("", [for chunk in regexall(local.txt_chunk, rec.content) : chunk[0]]), "/\\\\([\"\\\\])/", "$1")
       : rec.content
     )
     if rec.type == "TXT"
