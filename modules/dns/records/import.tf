@@ -8,18 +8,20 @@ locals {
   #
   # Cloudflare stores TXT content as it was sent, and v=spf1 "a" -all and
   # "v=spf1 \"a\" -all" are the same DNS record. A value in the zone file form
-  # (one or more quoted chunks, "a" "b") is compared as its chunks joined, without
-  # the quotes and the escapes \" and \\. Any other value is compared exactly, quotes
-  # included, so prefix" "suffix is not prefixsuffix; so is a value with another
-  # escape such as \065 (a decimal escape, "A" in zone files), which is not decoded.
+  # (one or more quoted chunks, "a" "b", with no escapes other than \" and \\) is
+  # compared as its chunks joined and unescaped; a value without a leading quote is
+  # literal text, compared as written, so prefix" "suffix is not prefixsuffix. A value
+  # with a leading quote that is not in that form (such as "\065", where \065 is a
+  # decimal escape, "A" in zone files) is opaque: it only matches the same text, never
+  # a decoded value. The comparison value is the pair, as JSON.
   txt_zone_file_form = "^\"(?:[^\"\\\\]|\\\\[\"\\\\])*\"(?:[ \\t]+\"(?:[^\"\\\\]|\\\\[\"\\\\])*\")*$"
   txt_chunk          = "\"((?:[^\"\\\\]|\\\\[\"\\\\])*)\""
   existing_txt = {
     for r in var.existing_records : r.id => (
       r.content == null ? "" :
       can(regex(local.txt_zone_file_form, r.content))
-      ? replace(join("", [for chunk in regexall(local.txt_chunk, r.content) : chunk[0]]), "/\\\\([\"\\\\])/", "$1")
-      : r.content
+      ? jsonencode({ opaque = false, value = replace(join("", [for chunk in regexall(local.txt_chunk, r.content) : chunk[0]]), "/\\\\([\"\\\\])/", "$1") })
+      : jsonencode({ opaque = startswith(r.content, "\""), value = r.content })
     )
   }
   existing = [
@@ -52,8 +54,8 @@ locals {
   configured_txt = {
     for key, rec in local.flat_records : key => (
       can(regex(local.txt_zone_file_form, rec.content))
-      ? replace(join("", [for chunk in regexall(local.txt_chunk, rec.content) : chunk[0]]), "/\\\\([\"\\\\])/", "$1")
-      : rec.content
+      ? jsonencode({ opaque = false, value = replace(join("", [for chunk in regexall(local.txt_chunk, rec.content) : chunk[0]]), "/\\\\([\"\\\\])/", "$1") })
+      : jsonencode({ opaque = startswith(rec.content, "\""), value = rec.content })
     )
     if rec.type == "TXT"
   }

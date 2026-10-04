@@ -522,3 +522,44 @@ run "import_ipv4_mapped_in_another_form" {
   }
 }
 
+# A value that is not in the supported zone file form is opaque: it never matches the
+# decoded value of another one, in both directions (contents below as sent:
+# "\065" and "\"\\065\"", "v=spf1 \045all" quoted and its escaped form)
+run "import_txt_opaque_never_matches_a_decoded_value" {
+  command = plan
+
+  variables {
+    records = {
+      "app" = {
+        TXT = [
+          { content = "\"\\065\"", key = "opaque" },
+          { content = "\"\\\"v=spf1 \\\\045all\\\"\"", key = "encoded" },
+        ]
+      }
+    }
+    existing_records = [
+      { id = "id-encoded", name = "app.example.com", type = "TXT", content = "\"\\\"\\\\065\\\"\"" },
+      { id = "id-opaque", name = "app.example.com", type = "TXT", content = "\"v=spf1 \\045all\"" },
+    ]
+  }
+
+  assert {
+    condition     = output.import_record_ids == {}
+    error_message = "An opaque value must not match a decoded one"
+  }
+}
+
+run "import_txt_opaque_same_text" {
+  command = plan
+
+  variables {
+    records          = { "app" = { TXT = [{ content = "\"v=spf1 \\045all\"", key = "spf" }] } }
+    existing_records = [{ id = "id-spf", name = "app.example.com", type = "TXT", content = "\"v=spf1 \\045all\"" }]
+  }
+
+  assert {
+    condition     = output.import_record_ids == { "app TXT spf" = "id-spf" }
+    error_message = "An opaque value matches the same text"
+  }
+}
+
