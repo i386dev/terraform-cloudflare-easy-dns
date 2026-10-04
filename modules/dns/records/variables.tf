@@ -22,8 +22,8 @@ variable "default_ttl" {
   nullable    = false
 
   validation {
-    condition     = var.default_ttl == 1 || (var.default_ttl >= 30 && var.default_ttl <= 86400)
-    error_message = "default_ttl must be 1 (automatic) or between 30 and 86400 seconds."
+    condition     = floor(var.default_ttl) == var.default_ttl && (var.default_ttl == 1 || (var.default_ttl >= 30 && var.default_ttl <= 86400))
+    error_message = "default_ttl must be a whole number of seconds, 1 (automatic) or between 30 and 86400."
   }
 }
 
@@ -281,17 +281,17 @@ variable "records" {
         for raw_key, recs in type_map : [
           for kind in [element(split(".", raw_key), length(split(".", raw_key)) - 1)] : [
             for idx, rec in recs : "records[\"${base_name}\"][\"${raw_key}\"][${idx}]: ttl ${rec.ttl}"
-            if !(rec.ttl == null || rec.ttl == 1 || (coalesce(rec.ttl, 1) >= 30 && coalesce(rec.ttl, 1) <= 86400))
+            if !(rec.ttl == null || (floor(coalesce(rec.ttl, 1)) == coalesce(rec.ttl, 1) && (rec.ttl == 1 || (coalesce(rec.ttl, 1) >= 30 && coalesce(rec.ttl, 1) <= 86400))))
           ]
         ]
       ]
     ])) == 0
-    error_message = "TTL must be 1 (automatic) or between 30 and 86400 seconds:\n${join("\n", flatten([
+    error_message = "TTL must be a whole number of seconds, 1 (automatic) or between 30 and 86400:\n${join("\n", flatten([
       for base_name, type_map in var.records : [
         for raw_key, recs in type_map : [
           for kind in [element(split(".", raw_key), length(split(".", raw_key)) - 1)] : [
             for idx, rec in recs : "records[\"${base_name}\"][\"${raw_key}\"][${idx}]: ttl ${rec.ttl}"
-            if !(rec.ttl == null || rec.ttl == 1 || (coalesce(rec.ttl, 1) >= 30 && coalesce(rec.ttl, 1) <= 86400))
+            if !(rec.ttl == null || (floor(coalesce(rec.ttl, 1)) == coalesce(rec.ttl, 1) && (rec.ttl == 1 || (coalesce(rec.ttl, 1) >= 30 && coalesce(rec.ttl, 1) <= 86400))))
           ]
         ]
       ]
@@ -339,6 +339,26 @@ variable "records" {
             for idx, rec in recs : "records[\"${base_name}\"][\"${raw_key}\"][${idx}]"
             if rec.priority == null
           ] if contains(["MX", "URI"], kind)
+        ]
+      ]
+    ]))}"
+  }
+
+  # Priorities are 16-bit numbers in DNS
+  validation {
+    condition = length(flatten([
+      for base_name, type_map in var.records : [
+        for raw_key, recs in type_map : [
+          for idx, rec in recs : "records[\"${base_name}\"][\"${raw_key}\"][${idx}]: priority ${rec.priority}"
+          if !(rec.priority == null || (floor(coalesce(rec.priority, 0)) == coalesce(rec.priority, 0) && coalesce(rec.priority, 0) >= 0 && coalesce(rec.priority, 0) <= 65535))
+        ]
+      ]
+    ])) == 0
+    error_message = "priority must be a whole number between 0 and 65535:\n${join("\n", flatten([
+      for base_name, type_map in var.records : [
+        for raw_key, recs in type_map : [
+          for idx, rec in recs : "records[\"${base_name}\"][\"${raw_key}\"][${idx}]: priority ${rec.priority}"
+          if !(rec.priority == null || (floor(coalesce(rec.priority, 0)) == coalesce(rec.priority, 0) && coalesce(rec.priority, 0) >= 0 && coalesce(rec.priority, 0) <= 65535))
         ]
       ]
     ]))}"
@@ -581,11 +601,12 @@ variable "records" {
 variable "existing_records" {
   description = "Records that already exist in the zone, used to find import IDs. Names are fully qualified, as returned by the Cloudflare API"
   type = list(object({
-    id      = string
-    name    = string
-    type    = string
-    content = optional(string)
-    data    = optional(map(string))
+    id       = string
+    name     = string
+    type     = string
+    content  = optional(string)
+    priority = optional(number)
+    data     = optional(map(string))
   }))
   default = []
 }

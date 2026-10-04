@@ -123,7 +123,7 @@ def schema():
         "OPENPGPKEY": record({"content": {"description": "Public key", "type": "string"}}, ["content"], "OPENPGPKEY record (provider v5 only)"),
         "MX": {
             **record(
-                {"content": hostname("Mail server hostname, . for a null MX (RFC 7505)", "@", "."), "priority": {"description": "Priority, lower is preferred (0 for a null MX)", "type": "integer"}},
+                {"content": hostname("Mail server hostname, . for a null MX (RFC 7505)", "@", "."), "priority": {"description": "Priority, lower is preferred (0 for a null MX)", "type": "integer", "minimum": 0, "maximum": 65535}},
                 ["content", "priority"], "MX record",
             ),
             # A null MX (RFC 7505) has preference 0
@@ -157,7 +157,7 @@ def schema():
         properties = {"data": data}
         required_fields = ["data"]
         if record_type == "URI":
-            properties["priority"] = {"description": "Priority, lower is preferred", "type": "integer"}
+            properties["priority"] = {"description": "Priority, lower is preferred", "type": "integer", "minimum": 0, "maximum": 65535}
             required_fields.append("priority")
         types[record_type] = record(properties, required_fields, f"{record_type} record")
 

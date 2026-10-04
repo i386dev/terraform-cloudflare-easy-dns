@@ -1057,3 +1057,59 @@ run "null_mx_with_another_priority" {
   }
   expect_failures = [var.records]
 }
+
+run "fractional_ttl" {
+  command = plan
+  variables {
+    records = { "app" = { A = [{ content = "192.0.2.1", ttl = 60.5 }] } }
+  }
+  expect_failures = [var.records]
+}
+
+run "fractional_priority" {
+  command = plan
+  variables {
+    records = { "@" = { MX = [{ content = "mail.example.com", priority = 10.5 }] } }
+  }
+  expect_failures = [var.records]
+}
+
+run "priority_over_16_bits" {
+  command = plan
+  variables {
+    records = { "@" = { MX = [{ content = "mail.example.com", priority = 65536 }] } }
+  }
+  expect_failures = [var.records]
+}
+
+# Each part is valid on its own; together with the prefix and the zone the name has
+# 267 characters
+run "fqdn_over_253_characters" {
+  command = plan
+  variables {
+    records = { "${join("", [for i in range(63) : "a"])}.${join("", [for i in range(63) : "a"])}.${join("", [for i in range(63) : "a"])}" = { "${join("", [for i in range(63) : "a"])}.TXT" = [{ content = "x" }] } }
+  }
+  expect_failures = [output.flat_records]
+}
+
+run "fqdn_of_253_characters" {
+  command = plan
+  variables {
+    # 3 x 63 + 49 + 4 dots + example.com (11) = 253
+    records = { "${join("", [for i in range(63) : "a"])}.${join("", [for i in range(63) : "a"])}.${join("", [for i in range(63) : "a"])}" = { "${join("", [for i in range(49) : "b"])}.TXT" = [{ content = "x" }] } }
+  }
+  assert {
+    condition     = length(one(values(output.flat_records)).fqdn) == 253
+    error_message = "A name of 253 characters is valid"
+  }
+}
+
+# The alias target combines the prefix, the name and the zone: 267 characters
+run "alias_target_over_253_characters" {
+  command = plan
+  variables {
+    records = { "${join("", [for i in range(63) : "a"])}.${join("", [for i in range(63) : "a"])}.${join("", [for i in range(63) : "a"])}" = { "${join("", [for i in range(63) : "a"])}.ALIASES" = [{ content = "www" }] } }
+  }
+  expect_failures = [output.flat_records]
+}
+

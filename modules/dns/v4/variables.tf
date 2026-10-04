@@ -71,7 +71,8 @@ variable "records" {
           for record in list : concat(
             [for attribute in ["content", "key", "comment", "tag"] : !contains(["true", "false"], jsonencode(try(record[attribute], "")))],
             [for field in try(keys(record.data), []) : !contains(["true", "false"], jsonencode(try(record.data[field], ""))) || (field == "lat_direction" && jsonencode(try(record.data[field], "")) == "false")],
-            [for index in try(range(length(record.tags)), []) : !contains(["true", "false"], jsonencode(try(record.tags[index], "")))],
+            # tags may be a list or a set (a set has no index), so the values are iterated
+            try([for tag in record.tags : !contains(["true", "false"], jsonencode(tag))], []),
           )
         ]
       ]
@@ -90,8 +91,8 @@ variable "records" {
                 if contains(["true", "false"], jsonencode(try(record.data[field], ""))) && !(field == "lat_direction" && jsonencode(try(record.data[field], "")) == "false")
               ],
               [
-                for tag_index in try(range(length(record.tags)), []) : "records[\"${name}\"][\"${type}\"][${index}].tags[${tag_index}] is ${jsonencode(try(record.tags[tag_index], ""))}"
-                if contains(["true", "false"], jsonencode(try(record.tags[tag_index], "")))
+                for tag in try([for tag in record.tags : tag], []) : "records[\"${name}\"][\"${type}\"][${index}].tags has ${jsonencode(tag)}"
+                if contains(["true", "false"], jsonencode(tag))
               ],
             )
           ]
@@ -109,8 +110,8 @@ variable "default_ttl" {
   nullable    = false
 
   validation {
-    condition     = var.default_ttl == 1 || (var.default_ttl >= 30 && var.default_ttl <= 86400)
-    error_message = "default_ttl must be 1 (automatic) or between 30 and 86400 seconds."
+    condition     = floor(var.default_ttl) == var.default_ttl && (var.default_ttl == 1 || (var.default_ttl >= 30 && var.default_ttl <= 86400))
+    error_message = "default_ttl must be a whole number of seconds, 1 (automatic) or between 30 and 86400."
   }
 }
 

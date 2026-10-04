@@ -103,6 +103,26 @@ run "null_defaults" {
   }
 }
 
+run "booleans_in_a_set_of_tags" {
+  command = plan
+
+  variables {
+    records = { "app" = { A = [{ content = "192.0.2.1", tags = toset([false]) }] } }
+  }
+
+  expect_failures = [var.records]
+}
+
+run "fractional_default_ttl" {
+  command = plan
+
+  variables {
+    default_ttl = 3600.5
+  }
+
+  expect_failures = [var.default_ttl]
+}
+
 # The same document as the schema tests, through yamldecode like a dns.yaml
 run "yaml_all_types" {
   command = plan

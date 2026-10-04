@@ -31,7 +31,7 @@ Out of scope: bugs of the Cloudflare provider, the Cloudflare API and Terraform 
 
 ## Verifying Releases
 
-Each release archive has a checksum in `SHA256SUMS` and signed build provenance, see [Local Copy](README.md#local-copy):
+Each release archive has a checksum in `SHA256SUMS` and signed build provenance, see [Local Copy](README.md#local-copy). From 2.10.4, the release workflow builds the archives and the GitHub release only after CI passed for the tagged commit (the tag itself, used by Git sources, exists as soon as it is pushed):
 
 ```sh
 gh attestation verify terraform-cloudflare-easy-dns-<version>.tar.gz \
