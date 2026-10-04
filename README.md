@@ -634,7 +634,7 @@ Matching ignores the case and a trailing dot of names, hostnames (`target`, `rep
 
 ## Records Not in the Configuration
 
-With `report_unmanaged = true` (provider v5), the module reads the records of all types in the zone and lists those that no configured record matches, in the `unmanaged_records` output (`id`, `name`, `type`, `content`, `data`) and in a `plan` warning. Records are compared like in [import](#importing-existing-records). Nothing is deleted: Terraform can only delete records that are in its state, and deleting records outside it could remove the records of other tools (see [Next to external-dns](#next-to-external-dns)). For each listed record, add it to `records` (with `import_existing`, it is then adopted) or delete it yourself.
+With `report_unmanaged = true` (provider v5), the module reads the records of all types in the zone and lists those that no configured record matches, in the `unmanaged_records` output (`id`, `name`, `type`, `content`, `data`) and in a `plan` warning. The warning shows the type, name and ID only, and the output is sensitive (`terraform output -json unmanaged_records`): the content of a proxied record is the origin address that Cloudflare hides from DNS, and plans often end up in CI logs. Records are compared like in [import](#importing-existing-records). Nothing is deleted: Terraform can only delete records that are in its state, and deleting records outside it could remove the records of other tools (see [Next to external-dns](#next-to-external-dns)). For each listed record, add it to `records` and adopt it with an `import` block (`import_existing` gives the import IDs, see [Importing Existing Records](#importing-existing-records)), or delete it yourself.
 
 ```hcl
 module "dns" {

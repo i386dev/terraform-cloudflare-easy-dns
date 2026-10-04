@@ -607,3 +607,22 @@ run "unmanaged_records_with_import" {
     error_message = "The import and the report work together"
   }
 }
+
+# MX 10 is configured, the zone has MX 10 and MX 20 on the same host: MX 10 is
+# imported, MX 20 is not described by the configuration
+run "unmanaged_records_after_priority" {
+  command = plan
+
+  variables {
+    records = { "@" = { MX = [{ content = "mail.example.com", priority = 10 }] } }
+    existing_records = [
+      { id = "id-mx-10", name = "example.com", type = "MX", content = "mail.example.com", priority = 10 },
+      { id = "id-mx-20", name = "example.com", type = "MX", content = "mail.example.com", priority = 20 },
+    ]
+  }
+
+  assert {
+    condition     = output.import_record_ids == { "@ MX mail.example.com" = "id-mx-10" } && [for r in output.unmanaged_records : r.id] == ["id-mx-20"]
+    error_message = "A record left out by the priority is unmanaged"
+  }
+}

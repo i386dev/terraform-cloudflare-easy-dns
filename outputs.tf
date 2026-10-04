@@ -24,6 +24,7 @@ output "import_duplicates" {
 }
 
 output "unmanaged_records" {
-  description = "Records in the zone that the configuration does not describe (id, name, type, content, data). Empty unless report_unmanaged is true"
+  description = "Records in the zone that the configuration does not describe (id, name, type, content, data). Empty unless report_unmanaged is true. Sensitive: the content of a proxied record is the origin address that Cloudflare hides"
   value       = module.v5.unmanaged_records
+  sensitive   = true
 }

@@ -94,7 +94,7 @@ stray_id=$(curl -fsS -X POST -H "Authorization: Bearer ${CLOUDFLARE_API_TOKEN}" 
     -d "$(jq -n --arg name "stray.${LABEL}.${E2E_ZONE_NAME}" '{type: "TXT", name: $name, content: "\"easy-dns stray\"", ttl: 300, comment: "easy-dns-e2e"}')" | jq -r .result.id)
 [ -n "$stray_id" ] && [ "$stray_id" != null ] || fail "could not create the stray record"
 tf v5 plan -no-color -out=tfplan -var a_value=192.0.2.20 -var txt_value=rotation=2 -var report_unmanaged=true >"${E2E_DIR}/plan.log" ||
-    fail "plan with report_unmanaged: $(tail -40 "${E2E_DIR}/plan.log")"
+    fail "plan with report_unmanaged: $(grep -E 'Error' "${E2E_DIR}/plan.log" | head -20)"
 reported=$(tf v5 show -json tfplan | jq -r --arg label "$LABEL" '[.planned_values.outputs.unmanaged_records.value[] | select(.name | contains($label)) | .id] | sort | join(" ")')
 [ "$reported" = "$stray_id" ] || fail "report_unmanaged: expected only ${stray_id} of this run, got '${reported}'"
 grep -q "records that the configuration does not describe" "${E2E_DIR}/plan.log" || fail "report_unmanaged: no plan warning"
