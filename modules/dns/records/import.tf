@@ -117,11 +117,11 @@ locals {
       ]
     )
   }
-  import_record_ids = {
+  matched_record_ids = {
     for id, keys in local.claim_winners : keys[0] => id
     if length(keys) == 1
   }
-  import_duplicates = merge(
+  matched_duplicates = merge(
     { for key, ids in local.narrowed_matches : key => ids if length(ids) > 1 },
     {
       for claim in flatten([
@@ -130,4 +130,47 @@ locals {
       ]) : claim.key => [claim.id]
     },
   )
+
+  # Without import_existing, the existing records are only reported (unmanaged
+  # records), so nothing is imported and an ambiguous match does not stop the plan
+  import_record_ids = { for key, id in local.matched_record_ids : key => id if var.import_existing }
+  import_duplicates = { for key, ids in local.matched_duplicates : key => ids if var.import_existing }
+
+  # Existing records that no configured record matches: records in the zone that the
+  # configuration does not describe. For the report, an MX or URI record describes only
+  # the existing records of its priority (MX 20 next to, or instead of, the configured
+  # MX 10 is unmanaged); an existing record without a known priority still matches.
+  # SRV keeps its priority in data, compared already. An import candidate of another
+  # priority is still listed: import_existing only offers IDs, and whether an import
+  # block adopts the record is not known here
+  report_matches = {
+    for key, ids in local.import_matches : key => (
+      contains(["MX", "URI"], local.flat_records[key].type) && local.flat_records[key].priority != null
+      ? [for id in ids : id if local.existing_priority[id] == null || local.existing_priority[id] == local.flat_records[key].priority]
+      : ids
+    )
+  }
+  matched_ids = toset(flatten(values(local.report_matches)))
+
+  # Configured records that several existing records match (copies of one record) for
+  # the report: type, name and IDs only, since record keys may contain origin
+  # addresses
+  report_ambiguous = {
+    for key, ids in local.report_matches : key => {
+      type = local.flat_records[key].type
+      name = local.flat_records[key].fqdn
+      ids  = ids
+    } if length(ids) > 1
+  }
+  unmanaged_records = [
+    for r in var.existing_records : {
+      id       = r.id
+      name     = r.name
+      type     = r.type
+      content  = r.content
+      priority = r.priority
+      data     = r.data
+    }
+    if !contains(local.matched_ids, r.id)
+  ]
 }

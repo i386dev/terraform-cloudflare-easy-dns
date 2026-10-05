@@ -24,3 +24,9 @@ variable "txt_value" {
   type        = string
   default     = "rotation=1"
 }
+
+variable "report_unmanaged" {
+  description = "Report the records of the zone that the configuration does not describe"
+  type        = bool
+  default     = false
+}

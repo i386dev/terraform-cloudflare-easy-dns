@@ -123,6 +123,22 @@ run "fractional_default_ttl" {
   expect_failures = [var.default_ttl]
 }
 
+# A smoke test: in an empty mocked zone the output is [] either way, and the internals
+# of module.v5 cannot be referenced here. That every input reaches module.v5 and every
+# output comes from it is checked by scripts/check-sync.sh
+run "report_unmanaged_passed_to_the_wrapper" {
+  command = plan
+
+  variables {
+    report_unmanaged = true
+  }
+
+  assert {
+    condition     = output.unmanaged_records == []
+    error_message = "report_unmanaged reaches the v5 wrapper and its output comes back"
+  }
+}
+
 # The same document as the schema tests, through yamldecode like a dns.yaml
 run "yaml_all_types" {
   command = plan

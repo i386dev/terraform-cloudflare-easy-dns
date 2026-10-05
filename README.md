@@ -66,7 +66,7 @@ Everything else (all record types, defaults, import of existing records, validat
 - [Record Model](#record-model): [record types](#record-types), [aliases](#the-aliases-logic), [record keys](#record-keys)
 - [Validation](#validation), [Inputs](#inputs), [Outputs](#outputs)
 - [Records in YAML](#records-in-yaml) with editor support, [Recipes](#recipes)
-- [Importing Existing Records](#importing-existing-records)
+- [Importing Existing Records](#importing-existing-records), [Records Not in the Configuration](#records-not-in-the-configuration)
 - [Upgrading and Migration](#upgrading-and-migration)
 - [Testing](#testing)
 
@@ -89,8 +89,8 @@ Everything else (all record types, defaults, import of existing records, validat
 
 The module fits zones whose records are written down and change through review. Something else fits better when:
 
-- **Records come from other systems at run time** (service discovery, Kubernetes ingresses, an inventory): a controller such as external-dns, or `cloudflare_dns_record` with `for_each` over that data. The module needs the records at `plan`, and every value computed by another resource needs a `key` (see [Record Keys](#record-keys)).
-- **The zone must match the configuration exactly**, with records that are not in it deleted: the module manages only its own records and leaves the rest of the zone alone; [import](#importing-existing-records) only adopts records that are in the configuration.
+- **Records come from other systems at run time** (service discovery, Kubernetes ingresses, an inventory): a controller such as external-dns (it can work [next to the module](#next-to-external-dns)), or `cloudflare_dns_record` with `for_each` over that data. The module needs the records at `plan`, and every value computed by another resource needs a `key` (see [Record Keys](#record-keys)).
+- **The zone must match the configuration exactly**, with records that are not in it deleted: the module manages only its own records and leaves the rest of the zone alone; [import](#importing-existing-records) only adopts records that are in the configuration, and [`report_unmanaged`](#records-not-in-the-configuration) lists the other records without deleting them.
 - **Records need lifecycle rules** (`prevent_destroy`, `ignore_changes`): Terraform does not let a configuration set them on the resources inside a module.
 - **Records need a type or field the module does not support**: see [the recipe](#a-record-type-or-field-the-module-does-not-support) for managing them next to the module call; when that is most of the zone, plain resources are simpler.
 
@@ -137,7 +137,7 @@ A copy in your repository needs neither GitHub nor the Terraform Registry to get
 
 ```sh
 REPO=https://github.com/i386dev/terraform-cloudflare-easy-dns
-VERSION=v2.11.1
+VERSION=v2.12.0
 ARCHIVE="terraform-cloudflare-easy-dns-${VERSION}.tar.gz"
 curl -fsSL -O "${REPO}/releases/download/${VERSION}/${ARCHIVE}"
 curl -fsSL -O "${REPO}/releases/download/${VERSION}/SHA256SUMS"
@@ -173,10 +173,10 @@ What a copy may change without affecting the module:
 To fetch the module on `terraform init` instead, use a Git source with a tag (or the URL of your own mirror):
 
 ```hcl
-source = "git::https://github.com/i386dev/terraform-cloudflare-easy-dns.git?ref=v2.11.1"
+source = "git::https://github.com/i386dev/terraform-cloudflare-easy-dns.git?ref=v2.12.0"
 ```
 
-For provider v4, add `//modules/dns/v4` before `?ref=`. In CI, where every run starts from a clean checkout, add `&depth=1` after the tag (`?ref=v2.11.1&depth=1`) to fetch only that commit instead of the whole history.
+For provider v4, add `//modules/dns/v4` before `?ref=`. In CI, where every run starts from a clean checkout, add `&depth=1` after the tag (`?ref=v2.12.0&depth=1`) to fetch only that commit instead of the whole history.
 
 ### HCL or YAML
 
@@ -419,7 +419,7 @@ The `records` input is validated before any API call. The module checks the stru
 
 ## Inputs
 
-Both wrappers take `zone_id`, `zone_name` (optional, looked up from `zone_id` when omitted; when set, it must be the name of that zone, see [Requirements](#requirements)), `records`, the [defaults](#defaults-comments-and-tags), `minimum_ttl` and `allowed_cname_conflicts` (see [Validation](#validation)); the v5 wrapper also takes `import_existing`.
+Both wrappers take `zone_id`, `zone_name` (optional, looked up from `zone_id` when omitted; when set, it must be the name of that zone, see [Requirements](#requirements)), `records`, the [defaults](#defaults-comments-and-tags), `minimum_ttl` and `allowed_cname_conflicts` (see [Validation](#validation)); the v5 wrapper also takes `import_existing` and `report_unmanaged`.
 
 The type of `records` is shown as `any`: Terraform silently drops unknown attributes when it converts a value to an object type, so the module accepts the value as is, rejects unknown attributes, and then converts it to the typed structure described in [Record Object Schema](#record-object-schema). The full reference of inputs, outputs, requirements and resources is generated from the code with [terraform-docs](https://terraform-docs.io): [`modules/dns/v4`](https://github.com/i386dev/terraform-cloudflare-easy-dns/tree/main/modules/dns/v4), [`modules/dns/v5`](https://github.com/i386dev/terraform-cloudflare-easy-dns/tree/main/modules/dns/v5).
 
@@ -482,6 +482,7 @@ Cloudflare supports record tags only on some plans and limits the length of comm
 - `state_migration`: map of the record keys used by 1.x to the current ones, see [Upgrading from v1](#from-v1-to-v2)
 - `import_ids` (v5): import IDs of records that already exist in the zone, see [Importing Existing Records](#importing-existing-records)
 - `import_duplicates` (v5): records that cannot be imported unambiguously, with the IDs of their matches; while there are any, `plan` stops
+- `unmanaged_records` (v5): with `report_unmanaged`, the records of the zone that the configuration does not describe, see [Records Not in the Configuration](#records-not-in-the-configuration)
 
 ## Records in YAML
 
@@ -595,6 +596,14 @@ A service advertised with SRV:
 }
 ```
 
+### Next to external-dns
+
+The module manages only the records in its configuration and leaves the others alone, so a controller such as [external-dns](https://github.com/kubernetes-sigs/external-dns) can manage records of the same zone, for example for Kubernetes ingresses. Give each its own names, so they never write the same record:
+
+- Let external-dns manage a subdomain (`--domain-filter=k8s.example.com`), or restrict it to annotated resources, and keep those names out of `records`.
+- external-dns keeps a TXT ownership record next to each record it manages (`--txt-owner-id`, `--txt-prefix`); leave these to it as well. A `CNAME` in `records` on a name that external-dns also uses fails at apply, and two tools writing the same `A` record overwrite each other.
+- With [`report_unmanaged`](#records-not-in-the-configuration), the records of external-dns show up as unmanaged; that is expected, the report only lists them.
+
 ## Importing Existing Records
 
 When the zone already has records, the first `apply` would fail with "record already exists" for each of them. With provider v5 (the root module or the `v5` submodule), the module can find the existing records and adopt them into the state instead. It works the same with records in HCL or in YAML; see [`examples/import`](https://github.com/i386dev/terraform-cloudflare-easy-dns/tree/main/examples/import).
@@ -622,6 +631,33 @@ Each lookup reads up to 10,000 records of one type; in a zone with more records 
 For structured records (`SRV`, `HTTPS`, `TLSA`, ...), provider v5 plans a one-time in-place update right after the import, without visible changes; after the `apply`, the plan is empty.
 
 Matching ignores the case and a trailing dot of names, hostnames (`target`, `replacement`, the issuer domain of CAA `issue`/`issuewild` values) and hex values (`digest`, `fingerprint`, and `certificate` of TLSA and SMIMEA records); other `data` fields (also the `target` of URI records, whose paths are case-sensitive), CAA parameters after `;`, `iodef` URLs and OPENPGPKEY keys must match exactly. IPv6 addresses are compared in their canonical form (`2001:0db8:0:0:0:0:0:1` is `2001:db8::1`). TXT values in the zone file form, one or more quoted chunks (`"v=spf1 \"a\" -all"`, `"v=spf1 a" " -all"`), are compared as the chunks joined without their quotes and escapes, since Cloudflare stores TXT content as it was sent and `v=spf1 "a" -all` is the same DNS record; any other value is compared exactly, quotes included (`prefix" "suffix` is not `prefixsuffix`). A TXT record stored in the quoted form and configured without quotes gets a one-time in-place update to the configured form after the import (the DNS answer does not change). An existing record is imported into one address only: configured records that differ only in `priority` (`MX`, `URI`) match the same existing record, which goes to the one with the same priority, while the others are created; without such a record, the import is ambiguous. In the same way, a record with a priority that matches several existing records (MX 10 and MX 20 on one host) takes the one with its priority. A record is imported only when its match is unambiguous. When it is not, for example when the zone has several identical records, `plan` stops (from 2.11.0; before, it showed a warning and planned the record as created) and lists the records with the IDs of all their matches. Remove the duplicates from the zone or give the records distinct values or priorities; to import such a record anyway, set `import_existing = false` and write an `import` block for it. The `import_duplicates` output has the same list.
+
+## Records Not in the Configuration
+
+With `report_unmanaged = true` (provider v5), the module reads the records of all types in the zone and lists those that no configured record matches, in the `unmanaged_records` output (`id`, `name`, `type`, `content`, `priority`, `data`) and in a `plan` warning. The warning shows the type, name and ID only (the first 50 records), and the output is sensitive: the content of a proxied record is the origin address that Cloudflare hides from DNS, and plans often end up in CI logs. Records are compared like in [import](#importing-existing-records); a configured `MX` or `URI` record describes the records of its priority (an `MX 20` next to the configured `MX 10` is listed, also when `import_existing` offers it for import: the module cannot see whether an `import` block adopts it). Without `import_existing`, the warning also lists configured records that match several records in the zone (copies of the same record, or a record described too loosely, such as a structured record without a field that tells two records apart), with type, name and IDs; with it, they stop the plan. The warning shows on `plan` and on `apply` while `report_unmanaged` is set. Nothing is deleted: Terraform can only delete records that are in its state, and deleting records outside it could remove the records of other tools (see [Next to external-dns](#next-to-external-dns)). For each listed record, add it to `records` and adopt it with an `import` block (`import_existing` gives the import IDs, see [Importing Existing Records](#importing-existing-records)), or delete it yourself.
+
+To read the values, pass the output through in the root module and read it from a saved plan (`terraform output` only shows the state of the last `apply`):
+
+```hcl
+module "dns" {
+  source           = "./modules/easy-dns"
+  zone_id          = var.zone_id
+  report_unmanaged = true
+  records          = { "@" = { A = [{ content = "192.0.2.1" }] } }
+}
+
+output "unmanaged_records" {
+  value     = module.dns.unmanaged_records
+  sensitive = true
+}
+```
+
+```sh
+terraform plan -out=tfplan
+terraform show -json tfplan | jq '.planned_values.outputs.unmanaged_records.value'
+```
+
+The report needs the `DNS Read` permission and makes one request per record type (21) on every plan, so turn it on when reviewing the zone rather than permanently. Like the import, a lookup that returns 10,000 records of one type (the limit) stops the plan, since the report would be incomplete. Records that Cloudflare manages itself and does not return as DNS records (the zone's own name servers) are not listed.
 
 ## Upgrading and Migration
 

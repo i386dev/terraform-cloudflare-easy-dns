@@ -4,6 +4,19 @@ All notable changes to this project are documented in this file. The format is b
 
 ## [Unreleased]
 
+## [2.12.0] - 2026-10-04
+
+### Added
+
+- `report_unmanaged` input (root module, v5 wrapper): reads the records of all types in the zone (one request per type, `DNS Read` permission) and lists those that the configuration does not describe in the new `unmanaged_records` output (sensitive: the content of a proxied record is its hidden origin address; read it from a saved plan) and a `plan` warning with the type, name and ID of each (the first 50); without `import_existing`, the warning also lists configured records that match several records in the zone (type, name and IDs). For the report, an MX or URI record describes only existing records of its priority (or of an unknown one); an import candidate of another priority is still listed, since the module cannot see the import blocks. Nothing is deleted; each record can be added to `records` and adopted with an `import` block, or deleted by hand. A lookup at the 10,000 limit stops the plan, as for the import
+- README: "Next to external-dns", how to share a zone with a controller that manages records at run time, and "Records Not in the Configuration"
+
+### Internal
+
+- The records module takes `import_existing` (default `true`): without it, existing records are only compared for the report, nothing is imported, and ambiguous matches do not stop the plan; new `unmanaged_records` output
+- `scripts/check-sync.sh` allows `report_unmanaged` next to `import_existing` as variables of the v5 wrapper only, and checks that the root module passes every input to the v5 wrapper (`name = var.name`) and takes every output from it
+- Tests: unmanaged records (with and without import, ambiguous matches count as matched, an extra MX next to a configured one of another priority, also when the configured one is in the zone twice, SRV with its priority in data), lookups of all record types, the output in the root module; e2e creates a record outside the module and checks that the report lists it and none of the records of the module (passed on this branch)
+
 ## [2.11.1] - 2026-10-04
 
 ### Fixed
@@ -357,7 +370,8 @@ All notable changes to this project are documented in this file. The format is b
 - Inline aliases pointed to a relative name instead of the full hostname
 - Zone apex (`@`) handling for aliases and nested names
 
-[Unreleased]: https://github.com/i386dev/terraform-cloudflare-easy-dns/compare/v2.11.1...HEAD
+[Unreleased]: https://github.com/i386dev/terraform-cloudflare-easy-dns/compare/v2.12.0...HEAD
+[2.12.0]: https://github.com/i386dev/terraform-cloudflare-easy-dns/compare/v2.11.1...v2.12.0
 [2.11.1]: https://github.com/i386dev/terraform-cloudflare-easy-dns/compare/v2.11.0...v2.11.1
 [2.11.0]: https://github.com/i386dev/terraform-cloudflare-easy-dns/compare/v2.10.4...v2.11.0
 [2.10.4]: https://github.com/i386dev/terraform-cloudflare-easy-dns/compare/v2.10.3...v2.10.4

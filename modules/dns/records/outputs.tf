@@ -54,3 +54,16 @@ output "import_duplicates" {
   description = "Cloudflare record IDs of existing_records that a configured record cannot be matched to unambiguously, keyed by record key. While there are any, import_record_ids fails and the plan stops"
   value       = local.import_duplicates
 }
+
+output "ambiguous_matches" {
+  description = "Configured records that several existing records match (copies of one record), keyed by record key, with type, name and IDs, also without import_existing. Sensitive: record keys may contain origin addresses"
+  value       = local.report_ambiguous
+  sensitive   = true
+}
+
+output "unmanaged_records" {
+  description = "existing_records that no configured record matches: records in the zone that the configuration does not describe. Sensitive: the content of a proxied record is the origin address that Cloudflare hides"
+  value       = local.unmanaged_records
+  sensitive   = true
+}
+

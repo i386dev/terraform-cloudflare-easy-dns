@@ -29,3 +29,9 @@ output "import_duplicates" {
   description = "Cloudflare record IDs of existing records that a configured record cannot be matched to unambiguously, keyed by record key. Empty unless import_existing is true; while there are any, the plan stops with this list"
   value       = module.records.import_duplicates
 }
+
+output "unmanaged_records" {
+  description = "Records in the zone that the configuration does not describe (id, name, type, content, priority, data). Empty unless report_unmanaged is true. Sensitive: the content of a proxied record is the origin address that Cloudflare hides"
+  value       = [for r in module.records.unmanaged_records : r if var.report_unmanaged]
+  sensitive   = true
+}

@@ -563,3 +563,178 @@ run "import_txt_opaque_same_text" {
   }
 }
 
+# Records of the zone that no configured record matches are reported as unmanaged;
+# an ambiguous match counts as matched
+run "unmanaged_records" {
+  command = plan
+
+  variables {
+    records = { "app" = { A = [{ content = "192.0.2.1" }] }, "dup" = { A = [{ content = "192.0.2.9" }] } }
+    existing_records = [
+      { id = "id-app", name = "app.example.com", type = "A", content = "192.0.2.1" },
+      { id = "id-dup-1", name = "dup.example.com", type = "A", content = "192.0.2.9" },
+      { id = "id-dup-2", name = "dup.example.com", type = "A", content = "192.0.2.9" },
+      { id = "id-other", name = "other.example.com", type = "A", content = "192.0.2.2" },
+      { id = "id-txt", name = "app.example.com", type = "TXT", content = "external-dns owner" },
+    ]
+    import_existing = false
+  }
+
+  assert {
+    condition     = [for r in output.unmanaged_records : r.id] == ["id-other", "id-txt"]
+    error_message = "Only records that no configured record matches are unmanaged"
+  }
+
+  assert {
+    condition     = length(output.import_record_ids) == 0 && length(output.import_duplicates) == 0
+    error_message = "Without import_existing nothing is imported, and ambiguous matches do not stop the plan"
+  }
+}
+
+run "unmanaged_records_with_import" {
+  command = plan
+
+  variables {
+    records = { "app" = { A = [{ content = "192.0.2.1" }] } }
+    existing_records = [
+      { id = "id-app", name = "app.example.com", type = "A", content = "192.0.2.1" },
+      { id = "id-other", name = "other.example.com", type = "A", content = "192.0.2.2" },
+    ]
+  }
+
+  assert {
+    condition     = output.import_record_ids == { "app A 192.0.2.1" = "id-app" } && [for r in output.unmanaged_records : r.id] == ["id-other"]
+    error_message = "The import and the report work together"
+  }
+}
+
+# MX 10 is configured, the zone has MX 10 and MX 20 on the same host: MX 10 is
+# imported, MX 20 is not described by the configuration
+run "unmanaged_records_after_priority" {
+  command = plan
+
+  variables {
+    records = { "@" = { MX = [{ content = "mail.example.com", priority = 10 }] } }
+    existing_records = [
+      { id = "id-mx-10", name = "example.com", type = "MX", content = "mail.example.com", priority = 10 },
+      { id = "id-mx-20", name = "example.com", type = "MX", content = "mail.example.com", priority = 20 },
+    ]
+  }
+
+  assert {
+    condition     = output.import_record_ids == { "@ MX mail.example.com" = "id-mx-10" } && [for r in output.unmanaged_records : "${r.id} ${r.priority}"] == ["id-mx-20 20"]
+    error_message = "A record left out by the priority is unmanaged"
+  }
+}
+
+# MX 10 twice and MX 20 in the zone, MX 10 configured: MX 20 is unmanaged, the two
+# MX 10 are copies, reported with type, name and IDs (no record key)
+run "unmanaged_records_with_copies" {
+  command = plan
+
+  variables {
+    records = { "@" = { MX = [{ content = "mail.example.com", priority = 10 }] } }
+    existing_records = [
+      { id = "id-mx-10-a", name = "example.com", type = "MX", content = "mail.example.com", priority = 10 },
+      { id = "id-mx-10-b", name = "example.com", type = "MX", content = "mail.example.com", priority = 10 },
+      { id = "id-mx-20", name = "example.com", type = "MX", content = "mail.example.com", priority = 20 },
+    ]
+    import_existing = false
+  }
+
+  assert {
+    condition     = [for r in output.unmanaged_records : r.id] == ["id-mx-20"]
+    error_message = "A record of another priority is unmanaged, also next to copies"
+  }
+
+  assert {
+    condition     = jsonencode(values(output.ambiguous_matches)) == jsonencode([{ ids = ["id-mx-10-a", "id-mx-10-b"], name = "example.com", type = "MX" }]) && length(output.import_duplicates) == 0
+    error_message = "The copies are reported with type, name and IDs, and do not stop the plan without import_existing"
+  }
+}
+
+# Both priorities configured: MX 20 is described, only the MX 10 copies are ambiguous
+run "copies_next_to_another_priority" {
+  command = plan
+
+  variables {
+    records = { "@" = { MX = [{ key = "primary", content = "mail.example.com", priority = 10 }, { key = "backup", content = "mail.example.com", priority = 20 }] } }
+    existing_records = [
+      { id = "id-mx-10-a", name = "example.com", type = "MX", content = "mail.example.com", priority = 10 },
+      { id = "id-mx-10-b", name = "example.com", type = "MX", content = "mail.example.com", priority = 10 },
+      { id = "id-mx-20", name = "example.com", type = "MX", content = "mail.example.com", priority = 20 },
+    ]
+    import_existing = false
+  }
+
+  assert {
+    condition     = length(output.unmanaged_records) == 0 && jsonencode(output.ambiguous_matches) == jsonencode({ "@ MX primary" = { ids = ["id-mx-10-a", "id-mx-10-b"], name = "example.com", type = "MX" } })
+    error_message = "Only the copies of MX 10 are ambiguous"
+  }
+}
+
+# Only MX 20 in the zone, MX 10 configured: MX 20 is unmanaged. With import_existing it
+# is also offered for import (an import block would adopt it as MX 10), but the module
+# cannot know whether there is an import block, so the report still lists it
+run "other_priority_only_without_import" {
+  command = plan
+
+  variables {
+    records          = { "@" = { MX = [{ content = "mail.example.com", priority = 10 }] } }
+    existing_records = [{ id = "id-mx-20", name = "example.com", type = "MX", content = "mail.example.com", priority = 20 }]
+    import_existing  = false
+  }
+
+  assert {
+    condition     = [for r in output.unmanaged_records : r.id] == ["id-mx-20"]
+    error_message = "A record of another priority is unmanaged without the import"
+  }
+}
+
+run "other_priority_only_with_import" {
+  command = plan
+
+  variables {
+    records          = { "@" = { MX = [{ content = "mail.example.com", priority = 10 }] } }
+    existing_records = [{ id = "id-mx-20", name = "example.com", type = "MX", content = "mail.example.com", priority = 20 }]
+  }
+
+  assert {
+    condition     = output.import_record_ids == { "@ MX mail.example.com" = "id-mx-20" } && [for r in output.unmanaged_records : r.id] == ["id-mx-20"]
+    error_message = "An import candidate of another priority is offered and still reported"
+  }
+}
+
+# SRV keeps its priority in data (compared with the data); existing records have no
+# top-level priority for it, so it must not make the record unmanaged
+run "unmanaged_records_srv_priority_in_data" {
+  command = plan
+
+  variables {
+    records = { "_sip._tcp" = { SRV = [{ data = { priority = 10, weight = 5, port = 5060, target = "sip.example.com" } }] } }
+    existing_records = [
+      { id = "id-srv", name = "_sip._tcp.example.com", type = "SRV", data = { priority = "10", weight = "5", port = "5060", target = "sip.example.com." } },
+    ]
+    import_existing = false
+  }
+
+  assert {
+    condition     = length(output.unmanaged_records) == 0
+    error_message = "An SRV record that matches by data is described"
+  }
+}
+
+run "unmanaged_records_mx_priority_unknown" {
+  command = plan
+
+  variables {
+    records          = { "@" = { MX = [{ content = "mail.example.com", priority = 10 }] } }
+    existing_records = [{ id = "id-mx", name = "example.com", type = "MX", content = "mail.example.com" }]
+    import_existing  = false
+  }
+
+  assert {
+    condition     = length(output.unmanaged_records) == 0
+    error_message = "An existing record without a known priority is described"
+  }
+}

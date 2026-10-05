@@ -598,8 +598,15 @@ variable "records" {
   }
 }
 
+variable "import_existing" {
+  description = "Whether existing_records are matched to the configured records for import. When false, they are only compared to report unmanaged records"
+  type        = bool
+  default     = true
+  nullable    = false
+}
+
 variable "existing_records" {
-  description = "Records that already exist in the zone, used to find import IDs. Names are fully qualified, as returned by the Cloudflare API"
+  description = "Records that already exist in the zone, used to find import IDs and unmanaged records. Names are fully qualified, as returned by the Cloudflare API"
   type = list(object({
     id       = string
     name     = string
